@@ -3,8 +3,15 @@ package peersim.bittorrent;
 import peersim.config.Configuration;
 import peersim.core.GeneralNode;
 import utils.Interaction;
+import utils.Interaction.RESULT;
+import utils.Interaction.TYPE;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
+
+import static utils.Interaction.RESULT.GOOD;
+import static utils.Interaction.RESULT.SENT;
 
 /**
  * This class belongs to the package ${PACKAGE_NAME} and is for being use on
@@ -17,31 +24,47 @@ public class BitNode extends GeneralNode {
 
     private ArrayList<Interaction> interactions;
     private HashMap<Long, HashMap<Long, Integer>> nodeInteractions;
+    FileWriter file_interaction;
+    FileWriter file_blocks;
+    FileWriter file_requests;
 
-//    /**
-//     * Used to construct the prototype node. This class currently does not
-//     * have specific configuration parameters and so the parameter
-//     * <code>prefix</code> is not used. It reads the protocol components
-//     * (components that have type {@value Node#PAR_PROT}) from
-//     * the configuration.
-//     *
-//     * @param prefix
-//     */
+    //    /**
+    //     * Used to construct the prototype node. This class currently does not
+    //     * have specific configuration parameters and so the parameter
+    //     * <code>prefix</code> is not used. It reads the protocol components
+    //     * (components that have type {@value Node#PAR_PROT}) from
+    //     * the configuration.
+    //     *
+    //     * @param prefix
+    //     */
     public BitNode(String prefix) {
         super(prefix);
         pid = Configuration.getPid(prefix + "." + PAR_PROT);
         interactions = new ArrayList<>();
         nodeInteractions = new HashMap<>();
+        try {
+            file_interaction = new FileWriter
+                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/interaction_" + getID()+"" +
+                    ".csv");
+            file_blocks =  new FileWriter("/home/aferreira/Documentos/Hyrax/BitTrust/csv/blocks_" +
+                    getID()+"" +
+                    ".csv");
+            file_requests = new FileWriter
+                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/requests_" +
+                    getID()+".csv");
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer>
-                                                               map) {
+    private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
         List list = new LinkedList<>(map.entrySet());
         // Defined Custom Comparator here
         Collections.sort(list, new Comparator() {
             public int compare(Object o1, Object o2) {
-                return ((Comparable) ((Map.Entry) (o1)).getValue()).compareTo
-                        (((Map.Entry) (o2)).getValue());
+                return ((Comparable) ((Map.Entry) (o1)).getValue()).compareTo(((Map.Entry) (o2))
+                        .getValue());
             }
         });
 
@@ -50,66 +73,125 @@ public class BitNode extends GeneralNode {
         HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
         for (Iterator it = list.iterator(); it.hasNext(); ) {
             Map.Entry entry = (Map.Entry) it.next();
-            sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue
-                    ());
+            sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
         }
         return sortedHashMap;
     }
 
-    public boolean addInteraction(long time, long nodeID, Interaction.RESULT result,
-                                  Interaction.TYPE type) {
-        Interaction interaction = new Interaction(time, nodeID, result, type);
+    public boolean addInteraction(long time, long nodeID, RESULT result, TYPE type,
+                                  int blockID) {
+        Interaction interaction = new Interaction(time, nodeID, result, type, blockID);
         interactions.add(interaction);
+        try {
+            file_interaction.write(time+";"+nodeID+";"+result+";"+type+";"+blockID+"\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return true;
     }
 
-    public boolean turnGoodInteraction(Long time, Long nodeID, Interaction
-            .TYPE type) {
+    public boolean turnGoodInteraction(Long time, Long nodeID, TYPE type) {
         Interaction interaction = getInteraction(time, nodeID, type);
-        return interaction != null && interaction.setResult(Interaction.RESULT.GOOD);
+        return interaction != null && interaction.setResult(GOOD);
+    }
+
+    public boolean turnGoodInteraction(Long nodeID, TYPE type, int blockID) {
+        Interaction interaction = getInteraction(nodeID, type, blockID);
+        return interaction != null && interaction.setResult(GOOD);
+    }
+
+    public boolean turnGoodInteraction(Long time, Long nodeID, TYPE type, int blockID) {
+        Interaction interaction = getInteraction(time, nodeID, SENT, type, blockID);
+        return interaction != null && interaction.setResult(GOOD);
+    }
+
+    public int getNumberInteraction(Long time, Long nodeID, TYPE type) {
+        int count = 0;
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type) {
+
+                if (interaction.getTime() == time) {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    public int getNumberInteraction(Long nodeID, TYPE type, int blockID) {
+        int count = 0;
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type && interaction
+                    .getBlockID() == blockID) {
+
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int getNumberInteraction(Long time, Long nodeID, TYPE type, int blockID) {
+        int count = 0;
+        for (Interaction interaction : interactions) {
+            if (interaction.getTime() == time && interaction.getNodeID() == nodeID &&
+                    interaction.getType() == type && interaction.getBlockID() == blockID) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public void printInteractions() {
         System.out.println("HyraxNode " + getID() + ": " + interactions.size() +
                 " interactions");
         for (Interaction interaction : interactions) {
-            System.out.println("HyraxNode" + getID() + ": (" + interaction
-                    .getTime() + "," + interaction.getNodeID() + "," +
+            System.out.println("HyraxNode" + getID() + ": (" + interaction.getTime() + "," +
+                    interaction.getNodeID() + "," +
                     interaction.getResult() + "," + interaction.getType() +
                     ")");
         }
     }
 
-//    public void printInteractions(Long nodeID, Interaction.TYPE type) {
-//        IncrementalFreq freq = new IncrementalFreq();
-//        for (Interaction interaction : interactions) {
-//            if (interaction.getNodeID() == nodeID && interaction.getType() ==
-//                    type) {
-                //                System.out.println("HyraxNode: (" +
-                // interaction.getTime() +
-                //                        "," +
-                //                        interaction.getNodeID() + "," +
-                // interaction.getResult
-                //                        () +
-                //                        "," + interaction.getType() + ")");
-//                freq.add( interaction.getResult());
-//            }
-//        }
-//
-//        if (freq.getN() > 0) System.out.println("HyraxNode " + getID() + ": " +
-//                interactions.size() + " interactions which " + freq.getN() +
-//                " is with node " + nodeID + " type " + type);
-//
-//        freq.printAll(System.out);
-//    }
+    //    public void printInteractions(Long nodeID, Interaction.TYPE type) {
+    //        IncrementalFreq freq = new IncrementalFreq();
+    //        for (Interaction interaction : interactions) {
+    //            if (interaction.getNodeID() == nodeID && interaction.getType() ==
+    //                    type) {
+    //                System.out.println("HyraxNode: (" +
+    // interaction.getTime() +
+    //                        "," +
+    //                        interaction.getNodeID() + "," +
+    // interaction.getResult
+    //                        () +
+    //                        "," + interaction.getType() + ")");
+    //                freq.add( interaction.getResult());
+    //            }
+    //        }
+    //
+    //        if (freq.getN() > 0) System.out.println("HyraxNode " + getID() + ": " +
+    //                interactions.size() + " interactions which " + freq.getN() +
+    //                " is with node " + nodeID + " type " + type);
+    //
+    //        freq.printAll(System.out);
+    //    }
 
-    public Interaction getInteraction(long time, long nodeID, Interaction
-            .TYPE type) {
+    public void printInteraction(long time, long nodeID, TYPE type) {
         for (Interaction interaction : interactions) {
-            if (interaction.getNodeID() == nodeID && interaction.getType() ==
-                    type) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type) {
 
-                if ( interaction.getTime() == time) {
+                if (interaction.getTime() == time) {
+                    System.out.println("found a interaction");
+                }
+            }
+        }
+    }
+
+    public Interaction getInteraction(long time, long nodeID, TYPE type) {
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type) {
+
+                if (interaction.getTime() == time) {
                     return interaction;
                 }
             }
@@ -117,67 +199,149 @@ public class BitNode extends GeneralNode {
         return null;
     }
 
-//    public IncrementalFreq getInteractions(Long nodeID, Interaction.TYPE type) {
-//        IncrementalFreq freq = new IncrementalFreq();
-//        for (Interaction interaction : interactions) {
-//            if (interaction.getNodeID() == nodeID && interaction.getType() ==
-//                    type) {
-//                                System.out.println("HyraxNode: (" +
-//                 interaction.getTime() +
-//                                        "," +
-//                                        interaction.getNodeID() + "," +
-//                 interaction.getResult
-//                                        () +
-//                                        "," + interaction.getType() + ")");
-//                freq.add(interaction.getResult());
-//            }
-//        }
+    public Interaction getInteraction(long time, long nodeID, TYPE type, int blockID) {
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type &&
+                    interaction.getTime() == time && interaction.getBlockID() == blockID) {
+                return interaction;
+            }
+        }
+        return null;
+    }
 
-        //        if (freq.getN() > 0) System.out.println("HyraxNode " +
-        // getID() + ": " +
-        //                interactions.size() + " interactions which " + freq
-        // .getN() +
-        //                " is with node " + nodeID);
+    public Interaction getInteraction(long nodeID, TYPE type, int blockID) {
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type && interaction
+                    .getBlockID() == blockID) {
 
-        //        freq.printAll(System.out);
+                return interaction;
+            }
+        }
+        return null;
+    }
 
-//        return freq;
-//    }
+    public Interaction getInteraction(long time, long nodeID, RESULT result,TYPE
+            type, int
+            blockID) {
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type &&
+                    interaction.getResult() == result &&
+                    interaction.getTime() == time && interaction.getBlockID() == blockID) {
+                return interaction;
+            }
+        }
+        return null;
+    }
 
-//    public int getNumberInteractions(long nodeID, Interaction.TYPE type) {
-//        int count = 0;
-//        for (Interaction interaction : interactions) {
-//            if (interaction.getNodeID() == nodeID && interaction.getType() ==
-//                    type) {
-//                count++;
-//            }
-//        }
-//        return count;
-//    }
+    public void printInteraction(long nodeID, TYPE type, int blockID) {
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type && interaction
+                    .getBlockID() == blockID) {
 
-    public int getNumberInteractions(long nodeID, Interaction.TYPE type, Interaction.RESULT
-            result) {
+                System.out.println("found a interaction");
+            }
+        }
+    }
+
+    //    public IncrementalFreq getInteractions(Long nodeID, Interaction.TYPE type) {
+    //        IncrementalFreq freq = new IncrementalFreq();
+    //        for (Interaction interaction : interactions) {
+    //            if (interaction.getNodeID() == nodeID && interaction.getType() ==
+    //                    type) {
+    //                                System.out.println("HyraxNode: (" +
+    //                 interaction.getTime() +
+    //                                        "," +
+    //                                        interaction.getNodeID() + "," +
+    //                 interaction.getResult
+    //                                        () +
+    //                                        "," + interaction.getType() + ")");
+    //                freq.add(interaction.getResult());
+    //            }
+    //        }
+
+    //        if (freq.getN() > 0) System.out.println("HyraxNode " +
+    // getID() + ": " +
+    //                interactions.size() + " interactions which " + freq
+    // .getN() +
+    //                " is with node " + nodeID);
+
+    //        freq.printAll(System.out);
+
+    //        return freq;
+    //    }
+
+    public int getNumberInteractions(long nodeID, TYPE type) {
         int count = 0;
         for (Interaction interaction : interactions) {
-            if (interaction.getNodeID() == nodeID && interaction.getType() ==
-                    type && interaction.getResult() == result) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type) {
                 count++;
             }
         }
         return count;
     }
 
-    public HashMap<Long, Integer> getSortedInteractions(Interaction.TYPE type) {
+    public int getNumberInteractions(long nodeID, TYPE type, RESULT result) {
+        int count = 0;
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type && interaction
+                    .getResult() == result) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
 
         HashMap<Long, Integer> sortedInteractions = new HashMap<>();
 
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
             if (neighbor != null && neighbor.node != null) {
-                sortedInteractions.put(neighbor.node.getID(),
-                        getNumberInteractions(neighbor.node.getID(), type, Interaction.RESULT.GOOD));
+                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions(neighbor.node
+                        .getID(), type, GOOD));
             }
         }
         return sortByValues(sortedInteractions);
+    }
+
+    public void printResumedInteractions(TYPE type) {
+        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+            if (neighbor != null && neighbor.node != null && (neighbor.node.getID() == 2 /*||
+                    neighbor.node.getID() == 20*/ || getID() == 2)) {
+                System.out.print(neighbor.node.getID() + ":\t");
+
+                int[] stats = new int[4];
+
+                for (Interaction interaction : interactions) {
+                    if (interaction.getNodeID() == neighbor.node.getID() && interaction.getType()
+                            == type) {
+
+                        switch (interaction.getResult()) {
+
+                            case SENT:
+                                stats[0]++;
+                                System.out.println(interaction.getTime() +"-"+interaction
+                                        .getBlockID());
+                                break;
+                            case NO_REPLY:
+                                stats[1]++;
+                                break;
+                            case GOOD:
+                                stats[2]++;
+                                break;
+                            case BAD:
+                                stats[3]++;
+                                break;
+                        }
+                    }
+                }
+
+                for (int stat : stats) {
+                    System.out.print(stat + "\t");
+                }
+                System.out.println();
+            }
+        }
     }
 
     @Override
@@ -186,17 +350,44 @@ public class BitNode extends GeneralNode {
         result = (BitNode) super.clone();
         result.interactions = new ArrayList<>();
         result.nodeInteractions = new HashMap<>();
+        try {
+            result.file_interaction = new FileWriter
+                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/interactions_" +
+                    result.getID() + ".csv");
+            result.file_interaction.write("time;nodeID;result;type;blockID\n");
 
+            result.file_blocks = new FileWriter
+                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/blocks_" +
+                    result.getID() + ".csv");
+            result.file_blocks.write("requestTime;nodeId;value\n");
+
+
+            result.file_requests = new FileWriter
+                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/requests_" +
+                            result.getID()+"" +
+                            ".csv");
+            result.file_requests.write("receiveTime;sender;blockID;requestTime;receiver\n");
+
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return result;
     }
 
     /**
      * Add the interactions receive by {@code nodeID}
+     *
      * @param nodeID
      * @param nodeInteractions
      */
-    public void addNodeInteractions(long nodeID, HashMap<Long, Integer>
-            nodeInteractions) {
+    public void addNodeInteractions(long nodeID, HashMap<Long, Integer> nodeInteractions) {
         this.nodeInteractions.put(nodeID, nodeInteractions);
+    }
+
+    public boolean removeInteraction(long time, long nodeID, RESULT result,TYPE type, int blockID) {
+        Interaction interaction = getInteraction(time, nodeID, result, type, blockID);
+        return interactions.remove(interaction);
     }
 }

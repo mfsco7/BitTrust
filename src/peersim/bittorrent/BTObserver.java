@@ -27,9 +27,9 @@ import peersim.core.Control;
 import peersim.core.Network;
 import peersim.util.IncrementalFreq;
 import peersim.util.IncrementalStats;
-import utils.Interaction;
 
-import java.util.Map;
+import static utils.Interaction.TYPE.DOWNLOAD;
+import static utils.Interaction.TYPE.UPLOAD;
 
 /**
  * This {@link Control} provides a way to keep track of some
@@ -109,11 +109,15 @@ public class BTObserver implements Control {
 
                 // counts the number of completed pieces for the i-th node
                 for (int j = 0; j < numberOfPieces; j++) {
-                    if (((BitTorrent) (Network.get(i).getProtocol(pid)))
-                            .getFileStatus()[j] == 16) {
+                    int fileStatus =((BitTorrent) (Network.get(i).getProtocol(pid)))
+                            .getFileStatus()[j];
+                    if (fileStatus == 16) {
                         numberOfCompletedPieces++;
                     }
+//                    if (i == 2) System.out.println(j+": "+fileStatus);
                 }
+
+
 
 				/*
                  * Put here the output lines of the Observer. An example is
@@ -174,21 +178,39 @@ public class BTObserver implements Control {
                 //                    }
                 //                }
 
-                if (node.getID() == 2 || node.getID() == 20) {
-                    for (Map.Entry<Long, Integer> entry : node
-                            .getSortedInteractions(Interaction.TYPE.DOWNLOAD)
-                            .entrySet()) {
-                        System.out.println(entry.getKey() + ":" + entry
-                                .getValue());
-                    }
-                    for (Map.Entry<Long, Integer> entry : node
-                            .getSortedInteractions(Interaction.TYPE.UPLOAD)
-                            .entrySet()) {
-                        System.out.println(entry.getKey() + ":" + entry
-                                .getValue());
+//                if (node.getID() == 18 || node.getID() == 20) {
+//                    for (Map.Entry<Long, Integer> entry : node
+//                            .getSortedInteractions(DOWNLOAD)
+//                            .entrySet()) {
+//                        System.out.println(entry.getKey() + ":" + entry
+//                                .getValue());
+//                    }
+//                    for (Map.Entry<Long, Integer> entry : node
+//                            .getSortedInteractions(UPLOAD)
+//                            .entrySet()) {
+//                        System.out.println(entry.getKey() + ":" + entry
+//                                .getValue());
+//                    }
+
+                //TODO count download and upload interactions at same time
+                    node.printResumedInteractions(DOWNLOAD);
+                System.out.println("----------------------------");
+                    node.printResumedInteractions(UPLOAD);
+//                }
+/*
+                int dim = 0;
+                Queue incPieces = ((BitTorrent) (Network.get(i).getProtocol(pid))).incomingPieces;
+
+                for (int head = incPieces.head; head < incPieces.head+incPieces.dim;head++) {
+                    Request req =incPieces.queue[head%incPieces.maxSize];
+                    if(req.sender.getID()==2) {
+                        dim++;
+                        System.out.println(req.id +" - "+ req.time);
                     }
                 }
 
+                if(dim!=0)System.out.println("dim "+dim);
+*/
 
                 //                System.out.println();
                 //                ((BitNode) (Network.get(i)))

@@ -10,12 +10,14 @@ public class Interaction {
     private Long nodeID;
     private RESULT result;
     private TYPE type;
+    private int blockID;
 
-    public Interaction(Long time, Long nodeID, RESULT result, TYPE type) {
+    public Interaction(Long time, Long nodeID, RESULT result, TYPE type, int blockID) {
         this.time = time;
         this.nodeID = nodeID;
         this.result = result;
         this.type = type;
+        this.blockID = blockID;
     }
 
     public Long getTime() {
@@ -37,6 +39,10 @@ public class Interaction {
 
     public TYPE getType() {
         return type;
+    }
+
+    public int getBlockID() {
+        return blockID;
     }
 
     public enum TYPE {DOWNLOAD, UPLOAD}

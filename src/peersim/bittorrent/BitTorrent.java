@@ -28,9 +28,13 @@ import peersim.core.Node;
 import peersim.edsim.EDProtocol;
 import peersim.edsim.EDSimulator;
 import peersim.transport.Transport;
-import utils.Interaction;
 
+import java.io.IOException;
 import java.util.HashMap;
+
+import static utils.Interaction.RESULT.SENT;
+import static utils.Interaction.TYPE.DOWNLOAD;
+import static utils.Interaction.TYPE.UPLOAD;
 
 /**
  * This is the class that implements the peersim.BitTorrent module
@@ -556,15 +560,16 @@ public class BitTorrent implements EDProtocol {
                                 (pendingRequest[i], 0)] == 1) { //If the sender has that
                             // piece
                             HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-                                    .getSortedInteractions(Interaction.TYPE.DOWNLOAD);
+                                    .getSortedInteractions(DOWNLOAD);
                             // ev = new IntMsg(REQUEST, node, pendingRequest[i], CommonState
                             // .getTime());
                             ev = new RequestMsg(node, pendingRequest[i], CommonState.getTime(),
                                     downloadInteractions, null);
                             latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
                             EDSimulator.add(latency, ev, sender, pid);
-                            ((BitNode) node).addInteraction(CommonState.getTime(), sender.getID()
-                                    , Interaction.RESULT.SENT, Interaction.TYPE.DOWNLOAD);
+                            if (!((BitNode) node).addInteraction(CommonState.getTime(), sender
+                                    .getID(), SENT, DOWNLOAD, pendingRequest[i]))
+                                System.err.println("Interaction not added");
                             cache[senderIndex].justSent();
                         }
                         if (!alive(cache[senderIndex].node)) {
@@ -617,15 +622,15 @@ public class BitTorrent implements EDProtocol {
                                 //
                                 // CommonState.getTime());
                                 HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-                                        .getSortedInteractions(Interaction.TYPE.DOWNLOAD);
+                                        .getSortedInteractions(DOWNLOAD);
                                 ev = new RequestMsg(node, block, CommonState.getTime(),
                                         downloadInteractions, null);
                                 latency = ((Transport) node.getProtocol(tid)).getLatency(node,
                                         sender);
                                 EDSimulator.add(latency, ev, sender, pid);
-                                ((BitNode) node).addInteraction(CommonState.getTime(), sender
-                                        .getID(), Interaction.RESULT.SENT, Interaction.TYPE
-                                        .DOWNLOAD);
+                                if (!((BitNode) node).addInteraction(CommonState.getTime(),
+                                        sender.getID(), SENT, DOWNLOAD, block))
+                                    System.err.println("Interaction not added");
                                 cache[senderIndex].justSent();
                             } else {
                                 if (!alive(cache[senderIndex].node)) {
@@ -896,12 +901,14 @@ public class BitTorrent implements EDProtocol {
                 HashMap<Long, Integer> download = requestMsg.getDownload();
                 ((BitNode) node).addNodeInteractions(id, download);
 
-//                if (node.getID() == 1 && sender.getID() == 2) {
-//                    for (Map.Entry<Long, Integer> entry : ((RequestMsg) event).getDownload()
-//                            .entrySet()) {
-//                        System.out.println(entry.getKey() + ":" + entry.getValue());
-//                    }
-//                }
+                //                if (node.getID() == 1 && sender.getID() == 2) {
+                //                    for (Map.Entry<Long, Integer> entry : ((RequestMsg) event)
+                // .getDownload()
+                //                            .entrySet()) {
+                //                        System.out.println(entry.getKey() + ":" + entry
+                // .getValue());
+                //                    }
+                //                }
 
 				/*I serve the enqueued requests until 10 uploding pieces or an
                  empty queue*/
@@ -923,11 +930,11 @@ public class BitTorrent implements EDProtocol {
                         latency = ((Transport) node.getProtocol(tid)).getLatency(node, req.sender);
                         EDSimulator.add(latency + downloadTime, ev, req.sender, pid);
                         //TODO add upload interaction here
-                        ((BitNode) node).addInteraction(CommonState.getTime(), req.sender.getID()
-                                , Interaction.RESULT.GOOD, Interaction.TYPE.UPLOAD);
+                        ((BitNode) node).addInteraction(req.time, req.sender.getID(), SENT,
+                                UPLOAD, req.id);
                         cache[e.peer].justSent();
                         /*I send to me an event to indicate that the download is completed.
-						This prevent that, when the receiver death occurres, my value nPiecesUp
+                        This prevent that, when the receiver death occurres, my value nPiecesUp
 						doesn't decrease.*/
                         evnt = new SimpleMsg(DOWNLOAD_COMPLETED, req.sender);
                         EDSimulator.add(latency + downloadTime, evnt, node, pid);
@@ -947,6 +954,8 @@ public class BitTorrent implements EDProtocol {
                 downloading number of pieces */
                 nPiecesDown--;
 
+
+
                 if (peerStatus == 1)// To save CPU cycles
                     return;
                 //System.out.println("process, piece: sender is "+sender
@@ -963,6 +972,14 @@ public class BitTorrent implements EDProtocol {
                 int value = ((IntMsg) event).getInt();
                 int piece = decode(value, 0);
                 int block = decode(value, 1);
+
+                try {
+                    ((BitNode) node).file_blocks.write(requestTime+";"+sender.getID()+";" +
+                            ""+value+"\n");
+                } catch (IOException exception) {
+                    exception.printStackTrace();
+                }
+
                 /* If the block has not been already downloaded and it
                 belongs to the current downloading piece.*/
                 if (piece == currentPiece && decode(pieceStatus[block], 0) != piece) {
@@ -970,21 +987,45 @@ public class BitTorrent implements EDProtocol {
                     status[piece]++;
                     removeRequest(value);
 
-                //TODO Check if PIECE is a good one
-                if(!((BitNode) node).turnGoodInteraction(requestTime, sender.getID(), Interaction
-                        .TYPE.DOWNLOAD)) System.out.println("Didn't find a interaction");;
+                    if (!sender.turnGoodInteraction(requestTime, node.getID(), UPLOAD, value)) {
+                        System.out.println("Didn't find a upload interaction1");
+                    }
+
+                    //TODO Check if PIECE is a good one
+                    ((BitNode) node).turnGoodInteraction(requestTime, sender.getID(), DOWNLOAD,
+                            value);
+
                     requestNextBlocks(node, pid, e.peer);
 
                 } else { // Either a future piece or an owned piece
+
                     if (piece != currentPiece && status[piece] != 16) { //
                         // Piece not owned, will be considered later
                         incomingPieces.enqueue(value, sender, requestTime);
+
                     }
+
+                    //PIECE already owned, remove interaction
+
+                    if(!((BitNode) node).removeInteraction(requestTime, sender.getID(),
+                            SENT, DOWNLOAD, value)) {
+                                                    System.out.println("Remove duplicated " +
+                                                            "download not succeed " + requestTime
+                                                            +";"+node.getID()+";"+sender.getID()
+                                                            +";" +
+                                                            ""+value);
+                    };
+                    if(!sender.removeInteraction(requestTime, node.getID(), SENT, UPLOAD,
+                            value)) {
+                        System.out.println("Remove duplicated " +"upload not succeed " +
+                                requestTime+";" +sender.getID()+";"+node.getID()+";"+value
+                                                            );
+                    };
 
                 }
                 ev = new IntMsg(CANCEL, node, value);
-				/* I send a CANCEL to all nodes to which I previously
-				requested the block*/
+                /* I send a CANCEL to all nodes to which I previously
+                requested the block*/
                 for (int i = 0; i < swarmSize; i++) {
                     if (alive(cache[i].node) && unchokedBy[i] &&
                             swarm[i][decode(block, 0)] == 1 && cache[i].node != sender) {
@@ -992,23 +1033,17 @@ public class BitTorrent implements EDProtocol {
                                 .node);
                         EDSimulator.add(latency, ev, cache[i].node, pid);
                         cache[i].justSent();
+
+                        if(!((BitNode) node).removeInteraction(requestTime, cache[i].node.getID(),
+                                SENT, DOWNLOAD, value)) {
+//                            System.out.println("Cancel download not succeed");
+                        };
+                        if(!cache[i].node.removeInteraction(requestTime, node.getID(), SENT, UPLOAD,
+                                value)) {
+//                            System.out.println("Cancel upload not succeed");
+                        };
                     }
                 }
-                //                    System.out.println(getThisNodeID() +
-                // "/" + node.getID() +
-                //                            "->" + sender.getID());
-                //                    ((BitNode) node).addInteraction
-                // (CommonState.getTime(),
-                //                            sender.getID(), 1, 0);
-                //                System.out.print("Trying to turn
-                // interaction to a good " +
-                //                        "one...");
-                //                if (
-                //                        ) {
-                //                    System.out.println("succeed");
-                //                } else {
-                //                    System.out.println("failed");
-                //                }
 
                 if (status[currentPiece] == 16) { // if piece completed, I
                     // change the currentPiece to the next wanted
@@ -1048,13 +1083,14 @@ public class BitTorrent implements EDProtocol {
                         }
                     }
                     if (nPieceCompleted == nPieces) {
-                        System.out.println("FILE COMPLETED for peer " + node.getID());
+                        System.out.println("FILE COMPLETED for peer " + node.getID() + "at time "
+                                + CommonState.getTime());
                         this.peerStatus = 1;
                     }
 
 					/*	I set the currentPiece to the lastInterested. Then I
-					extract the queued received blocks */
-
+                    extract the queued received blocks */
+                    
                     currentPiece = lastInterested;
                     int m = incomingPieces.dim;
                     while (m > 0) { // I process the queue
@@ -1070,14 +1106,50 @@ public class BitTorrent implements EDProtocol {
                             pieceStatus[b] = temp.id;
                             status[p]++;
                             removeRequest(temp.id);
+
+                            temp.sender.turnGoodInteraction(temp.time, node.getID(), UPLOAD, temp
+                                    .id);
+
+                            //TODO Check if PIECE is a good one
+                            ((BitNode) node).turnGoodInteraction(temp.time, temp.sender
+                                    .getID(), DOWNLOAD, temp.id);
+
                             requestNextBlocks(node, pid, s.peer);
                         } else { // The piece not currently desired will be
                             // moved to the tail
                             if (p != currentPiece) // If not a duplicate
-                                // block but belongs to another piece
+                            // block but belongs to another piece
+                            {
                                 incomingPieces.enqueue(temp.id, temp.sender, temp.time);
-                            else // duplicate block
+                                System.err.println("another piece");
+                            } else // duplicate block
+                            {
+                                System.err.println("duplicate block!");
                                 requestNextBlocks(node, pid, s.peer);
+                                if (((BitNode) node).removeInteraction(temp.time, temp.sender
+                                        .getID(), SENT, DOWNLOAD, temp.id)) {
+                                    System.out.println("print  remove a interaction!");
+                                } else {
+                                    System.out.println("couldn't remove a download interaction "
+                                            + "here " + node.getID() + " <- "
+                                            + temp.sender.getID());
+                                    if (node.getID() == 2 || temp.sender.getID() == 2) {
+                                        System.out.println(node.getID() + " <- " + temp.sender
+                                                .getID());
+                                    }
+                                }
+                                if (temp.sender.removeInteraction(temp.time, node.getID(), SENT,
+                                        UPLOAD, temp.id)) {
+                                    System.out.println("print  remove a interaction!");
+                                } else {
+                                    System.out.println("couldn't remove a upload interaction " +
+                                            "here" + temp.sender.getID() + " -> " + node.getID());
+                                    if (node.getID() == 2 || temp.sender.getID() == 2) {
+                                        System.out.println(temp.sender.getID() + " -> " + node
+                                                .getID());
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1087,7 +1159,7 @@ public class BitTorrent implements EDProtocol {
 
             case CANCEL: {
                 //TODO when requester send cancel messages remove from
-                // interactions
+                // interactions (upload type)
                 Node sender = ((IntMsg) event).getSender();
                 int value = ((IntMsg) event).getInt();
                 requestToServe.remove(sender, value);
@@ -1169,16 +1241,16 @@ public class BitTorrent implements EDProtocol {
                 ev = new SimpleEvent(CHOKE_TIME);
                 EDSimulator.add(10000, ev, node, pid);
                 int j = 0;
-				/*I copy the interested nodes in the byBandwidth array*/
+                /*I copy the interested nodes in the byBandwidth array*/
                 for (int i = 0; i < swarmSize && byPeer[i].peer != -1; i++) {
                     if (cache[byPeer[i].peer].interested > 0) {
                         byBandwidth[j] = byPeer[i]; //shallow copy
                         j++;
                     }
                 }
-				
+
 				/*It ensures that in the next 20sec, if there are less nodes
-				interested than now, those in surplus will not be ordered. */
+                interested than now, those in surplus will not be ordered. */
                 for (; j < swarmSize; j++) {
                     byBandwidth[j] = null;
                 }
@@ -1291,8 +1363,8 @@ public class BitTorrent implements EDProtocol {
 
                 long now = CommonState.getTime();
                 for (int i = 0; i < swarmSize; i++) {
-					/*If are at least 2 minutes (plus 1 sec of tolerance) that
-					I don't send anything to it.*/
+                    /*If are at least 2 minutes (plus 1 sec of tolerance) that
+                    I don't send anything to it.*/
                     if (alive(cache[i].node) && (cache[i].lastSent < (now - 121000))) {
                         Object msg = new IntMsg(KEEP_ALIVE, node, 0);
                         latency = ((Transport) node.getProtocol(tid)).getLatency(node, cache[i]
@@ -1616,14 +1688,24 @@ public class BitTorrent implements EDProtocol {
                 // block, CommonState
                 //                        .getTime());
                 HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-                        .getSortedInteractions(Interaction.TYPE.DOWNLOAD);
+                        .getSortedInteractions(DOWNLOAD);
                 Object ev = new RequestMsg(node, block, CommonState.getTime(),
                         downloadInteractions, null);
                 long latency = ((Transport) node.getProtocol(tid)).getLatency(node, cache[sender]
                         .node);
                 EDSimulator.add(latency, ev, cache[sender].node, pid);
-                ((BitNode) node).addInteraction(CommonState.getTime(), cache[sender].node.getID()
-                        , Interaction.RESULT.SENT, Interaction.TYPE.DOWNLOAD);
+                try {
+                    RequestMsg requestMsg = (RequestMsg) ev;
+                    ((BitNode) node).file_requests.write((CommonState.getTime()+latency)+";"+(
+                            (RequestMsg)ev).getSender().getID()+";"+requestMsg.getInt()+";"+requestMsg
+                            .getTime()+";"+cache[sender].node.getID()+"\n");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                if (!((BitNode) node).addInteraction(CommonState.getTime(), cache[sender].node
+                        .getID(), SENT, DOWNLOAD, block))
+                    System.err.println("Interaction not added");
                 cache[sender].justSent();
             } else { // I cannot send request
                 if (!alive(cache[sender].node) && cache[sender].node != null) {
