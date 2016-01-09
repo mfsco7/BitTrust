@@ -567,6 +567,17 @@ public class BitTorrent implements EDProtocol {
                                     downloadInteractions, null);
                             latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
                             EDSimulator.add(latency, ev, sender, pid);
+
+                            RequestMsg requestMsg = (RequestMsg) ev;
+
+                            try {
+                                ((BitNode) node).file_requests.write(requestMsg.getTime()+";"+node.getID()
+                                        +";"+requestMsg.getInt()+";"+
+                                        (CommonState.getTime()+latency)+";"+sender.getID()+"\n");
+                            } catch (IOException exception) {
+                                exception.printStackTrace();
+                            }
+
                             if (!((BitNode) node).addInteraction(CommonState.getTime(), sender
                                     .getID(), SENT, DOWNLOAD, pendingRequest[i]))
                                 System.err.println("Interaction not added");
@@ -628,6 +639,16 @@ public class BitTorrent implements EDProtocol {
                                 latency = ((Transport) node.getProtocol(tid)).getLatency(node,
                                         sender);
                                 EDSimulator.add(latency, ev, sender, pid);
+
+                                RequestMsg requestMsg = (RequestMsg)ev;
+                                try {
+                                    ((BitNode) node).file_requests.write(requestMsg.getTime()+";"+node
+                                            .getID()+";"+requestMsg.getInt()+";"+
+                                            (CommonState.getTime()+latency)+";"+sender.getID()+"\n");
+                                } catch (IOException exception) {
+                                    exception.printStackTrace();
+                                }
+
                                 if (!((BitNode) node).addInteraction(CommonState.getTime(),
                                         sender.getID(), SENT, DOWNLOAD, block))
                                     System.err.println("Interaction not added");
@@ -1682,23 +1703,21 @@ public class BitTorrent implements EDProtocol {
     private void requestNextBlocks(Node node, int pid, int sender) {
         int block = getNewBlock(node, pid);
         while (block != -2) {
-            if (unchokedBy[sender] == true && alive(cache[sender].node) &&
+            if (unchokedBy[sender] && alive(cache[sender].node) &&
                     addRequest(block)) {
                 //                Object ev = new IntMsg(REQUEST, node,
                 // block, CommonState
                 //                        .getTime());
                 HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
                         .getSortedInteractions(DOWNLOAD);
-                Object ev = new RequestMsg(node, block, CommonState.getTime(),
+                RequestMsg ev = new RequestMsg(node, block, CommonState.getTime(),
                         downloadInteractions, null);
                 long latency = ((Transport) node.getProtocol(tid)).getLatency(node, cache[sender]
                         .node);
                 EDSimulator.add(latency, ev, cache[sender].node, pid);
                 try {
-                    RequestMsg requestMsg = (RequestMsg) ev;
-                    ((BitNode) node).file_requests.write((CommonState.getTime()+latency)+";"+(
-                            (RequestMsg)ev).getSender().getID()+";"+requestMsg.getInt()+";"+requestMsg
-                            .getTime()+";"+cache[sender].node.getID()+"\n");
+                    ((BitNode) node).file_requests.write(ev.getTime()+";"+node.getID()+";"+ev.getInt()+";"+
+                    (CommonState.getTime()+latency)+";"+cache[sender].node.getID()+"\n");
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

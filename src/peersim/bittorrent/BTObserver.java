@@ -28,6 +28,8 @@ import peersim.core.Network;
 import peersim.util.IncrementalFreq;
 import peersim.util.IncrementalStats;
 
+import java.io.IOException;
+
 import static utils.Interaction.TYPE.DOWNLOAD;
 import static utils.Interaction.TYPE.UPLOAD;
 
@@ -197,6 +199,12 @@ public class BTObserver implements Control {
                 System.out.println("----------------------------");
                     node.printResumedInteractions(UPLOAD);
 //                }
+
+                try {
+                    node.file_requests.flush();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
 /*
                 int dim = 0;
                 Queue incPieces = ((BitTorrent) (Network.get(i).getProtocol(pid))).incomingPieces;
