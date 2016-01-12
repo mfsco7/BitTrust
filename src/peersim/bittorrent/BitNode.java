@@ -21,12 +21,12 @@ public class BitNode extends GeneralNode {
 
     private static final String PAR_PROT = "protocol";
     private final int pid;
-
-    private ArrayList<Interaction> interactions;
-    private HashMap<Long, HashMap<Long, Integer>> nodeInteractions;
     FileWriter file_interaction;
     FileWriter file_blocks;
     FileWriter file_requests;
+    FileWriter messagesFile;
+    private ArrayList<Interaction> interactions;
+    private HashMap<Long, HashMap<Long, Integer>> nodeInteractions;
 
     //    /**
     //     * Used to construct the prototype node. This class currently does not
@@ -44,14 +44,15 @@ public class BitNode extends GeneralNode {
         nodeInteractions = new HashMap<>();
         try {
             file_interaction = new FileWriter
-                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/interaction_" + getID()+"" +
+                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/interaction_" + getID() + "" +
                     ".csv");
-            file_blocks =  new FileWriter("/home/aferreira/Documentos/Hyrax/BitTrust/csv/blocks_" +
-                    getID()+"" +
+            file_blocks = new FileWriter("/home/aferreira/Documentos/Hyrax/BitTrust/csv/blocks_" +
+                    getID() + "" +
                     ".csv");
             file_requests = new FileWriter
                     ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/requests_" +
-                    getID()+".csv");
+                    getID() + ".csv");
+            messagesFile = new FileWriter("csv/messages_" + getID() + ".csv");
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -78,12 +79,12 @@ public class BitNode extends GeneralNode {
         return sortedHashMap;
     }
 
-    public boolean addInteraction(long time, long nodeID, RESULT result, TYPE type,
-                                  int blockID) {
+    public boolean addInteraction(long time, long nodeID, RESULT result, TYPE type, int blockID) {
         Interaction interaction = new Interaction(time, nodeID, result, type, blockID);
         interactions.add(interaction);
         try {
-            file_interaction.write(time+";"+nodeID+";"+result+";"+type+";"+blockID+"\n");
+            file_interaction.write(time + ";" + nodeID + ";" + result + ";" + type + ";" +
+                    blockID + "\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -220,8 +221,7 @@ public class BitNode extends GeneralNode {
         return null;
     }
 
-    public Interaction getInteraction(long time, long nodeID, RESULT result,TYPE
-            type, int
+    public Interaction getInteraction(long time, long nodeID, RESULT result, TYPE type, int
             blockID) {
         for (Interaction interaction : interactions) {
             if (interaction.getNodeID() == nodeID && interaction.getType() == type &&
@@ -306,8 +306,8 @@ public class BitNode extends GeneralNode {
 
     public void printResumedInteractions(TYPE type) {
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            if (neighbor != null && neighbor.node != null && (neighbor.node.getID() == 2 /*||
-                    neighbor.node.getID() == 20*/ || getID() == 2)) {
+            if (neighbor != null && neighbor.node != null && (/*neighbor.node.getID() == 2 /*||*/
+                    neighbor.node.getID() == 18 || getID() == 18)) {
                 System.out.print(neighbor.node.getID() + ":\t");
 
                 int[] stats = new int[4];
@@ -320,7 +320,7 @@ public class BitNode extends GeneralNode {
 
                             case SENT:
                                 stats[0]++;
-                                System.out.println(interaction.getTime() +"-"+interaction
+                                System.out.println(interaction.getTime() + "-" + interaction
                                         .getBlockID());
                                 break;
                             case NO_REPLY:
@@ -351,25 +351,17 @@ public class BitNode extends GeneralNode {
         result.interactions = new ArrayList<>();
         result.nodeInteractions = new HashMap<>();
         try {
-            result.file_interaction = new FileWriter
-                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/interactions_" +
-                    result.getID() + ".csv");
+            result.file_interaction = new FileWriter("csv/interactions_" + result.getID() + ".csv");
             result.file_interaction.write("time;nodeID;result;type;blockID\n");
 
-            result.file_blocks = new FileWriter
-                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/blocks_" +
-                    result.getID() + ".csv");
-            result.file_blocks.write("requestTime;nodeId;value\n");
+            result.file_blocks = new FileWriter("csv/blocks_" + result.getID() + ".csv");
+            result.file_blocks.write("receiveTime;nodeId;value;requestTime\n");
 
+            result.file_requests = new FileWriter("csv/requestsA_" + result.getID() + "" + ".csv");
+            result.file_requests.write("requestTime;sender;blockID;receiveTime;receiver\n");
 
-            result.file_requests = new FileWriter
-                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/requests_" +
-                            result.getID()+"" +
-                            ".csv");
-            result.file_requests.write("receiveTime;sender;blockID;requestTime;receiver\n");
-
-
-
+            result.messagesFile = new FileWriter("csv/messages_" + result.getID() + ".csv");
+            result.messagesFile.write("Time;Sender;Type\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -386,7 +378,8 @@ public class BitNode extends GeneralNode {
         this.nodeInteractions.put(nodeID, nodeInteractions);
     }
 
-    public boolean removeInteraction(long time, long nodeID, RESULT result,TYPE type, int blockID) {
+    public boolean removeInteraction(long time, long nodeID, RESULT result, TYPE type, int
+            blockID) {
         Interaction interaction = getInteraction(time, nodeID, result, type, blockID);
         return interactions.remove(interaction);
     }

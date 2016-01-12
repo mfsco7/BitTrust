@@ -202,6 +202,8 @@ public class BTObserver implements Control {
 
                 try {
                     node.file_requests.flush();
+                    node.file_blocks.flush();
+                    node.messagesFile.flush();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
