@@ -1008,10 +1008,10 @@ public class BitTorrent implements EDProtocol {
                     pieceStatus[block] = value;
                     status[piece]++;
 
-                    if (node.getID() == 2 && piece == 35) {
-                        System.out.println(CommonState.getTime() + " receive a block " + value +
-                                " from " +sender.getID());
-                    }
+//                    if (node.getID() == 2 && piece == 35) {
+//                        System.out.println(CommonState.getTime() + " receive a block " + value +
+//                                " from " +sender.getID());
+//                    }
 
                     removeRequest(value);
 
@@ -1197,7 +1197,7 @@ public class BitTorrent implements EDProtocol {
                 Node sender = ((IntMsg) event).getSender();
                 int value = ((IntMsg) event).getInt();
                 long requestTime = ((IntMsg) event).getTime();
-                requestToServe.remove(sender, value);
+                requestToServe.remove(sender, value, requestTime);
 
                 try {
                     ((BitNode) node).messagesFile.write(CommonState.getTime() + ";" + sender
@@ -2311,7 +2311,7 @@ class Queue {
      * <tt>false</tt>
      * otherwise.
      */
-    public boolean remove(Node sender, int value) {
+    public boolean remove(Node sender, int value, long requestTime) {
         if (empty()) return false;
         for (int i = head; i < head + dim; i++) {
             if (queue[i % maxSize].id == value && queue[i % maxSize].sender == sender) {

@@ -306,8 +306,8 @@ public class BitNode extends GeneralNode {
 
     public void printResumedInteractions(TYPE type) {
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            if (neighbor != null && neighbor.node != null && (/*neighbor.node.getID() == 2 /*||*/
-                    neighbor.node.getID() == 18 || getID() == 18)) {
+            if (neighbor != null && neighbor.node != null /*&& (/*neighbor.node.getID() == 2 /*||
+                    neighbor.node.getID() == 18 || getID() == 18)*/) {
                 System.out.print(neighbor.node.getID() + ":\t");
 
                 int[] stats = new int[4];
