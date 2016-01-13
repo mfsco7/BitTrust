@@ -1035,17 +1035,17 @@ public class BitTorrent implements EDProtocol {
 
                         //PIECE already owned, remove interaction
 
-                        if (!((BitNode) node).removeInteraction(requestTime, sender.getID(), SENT, DOWNLOAD, value)) {
+                        if (!((BitNode) node).removeInteraction(sender.getID(), SENT, DOWNLOAD, value)) {
 
-                            //                        System.out.println("Remove duplicated download not succeed " + requestTime
-                            //                                +";"+node.getID()+";"+sender.getID
-                            // ()+";" +value);
+//                                                    System.out.println("Remove duplicated download not succeed " + requestTime
+//                                                            +";"+node.getID()+";"+sender.getID
+//                             ()+";" +value);
                         }
                         ;
-                        if (!sender.removeInteraction(requestTime, node.getID(), SENT, UPLOAD, value)) {
-                            //                        System.out.println("Remove duplicated " +"upload not succeed " +
-                            //                                requestTime+";" +sender.getID()+";"+node.getID()+";"+value
-                            //                                                            );
+                        if (!sender.removeInteraction(node.getID(), SENT, UPLOAD, value)) {
+//                                                    System.out.println("Remove duplicated " +"upload not succeed " +
+//                                                            requestTime+";" +sender.getID()+";"+node.getID()+";"+value
+//                                                                                        );
                         }
                         ;
 
@@ -1065,14 +1065,18 @@ public class BitTorrent implements EDProtocol {
 
                         if(!((BitNode) node).removeInteraction(requestTime, cache[i].node.getID(),
                                 SENT, DOWNLOAD, value)) {
-                            if (value == 3507 && node.getID() == 2 && cache[i].node.getID() == 18)
-                                System.out.println("Cancel download not succeed " + requestTime +
-                                        ";" + node.getID() + ";" + cache[i].node.getID() + ";" +
-                                        value);
+                            ((BitNode) node).removeInteraction(cache[i].node.getID(),
+                                    SENT, DOWNLOAD, value);
+//                            if (value == 3507 && node.getID() == 2 && cache[i].node.getID() == 18)
+//                                System.out.println("Cancel download not succeed " + requestTime +
+//                                        ";" + node.getID() + ";" + cache[i].node.getID() + ";" +
+//                                        value);
                         }
                         ;
                         if(!cache[i].node.removeInteraction(requestTime, node.getID(), SENT, UPLOAD,
                                 value)) {
+                            cache[i].node.removeInteraction(node.getID(), SENT, UPLOAD,
+                                    value);
 //                            System.out.println("Cancel upload not succeed "+requestTime+";" +
 //                                    cache[i].node.getID()+";"+node.getID()+";"+value);
                         };

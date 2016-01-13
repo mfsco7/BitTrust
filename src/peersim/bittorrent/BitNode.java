@@ -233,6 +233,17 @@ public class BitNode extends GeneralNode {
         return null;
     }
 
+    public Interaction getInteraction(long nodeID, RESULT result, TYPE type, int
+            blockID) {
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type &&
+                    interaction.getResult() == result && interaction.getBlockID() == blockID) {
+                return interaction;
+            }
+        }
+        return null;
+    }
+
     public void printInteraction(long nodeID, TYPE type, int blockID) {
         for (Interaction interaction : interactions) {
             if (interaction.getNodeID() == nodeID && interaction.getType() == type && interaction
@@ -383,4 +394,11 @@ public class BitNode extends GeneralNode {
         Interaction interaction = getInteraction(time, nodeID, result, type, blockID);
         return interactions.remove(interaction);
     }
+
+    public boolean removeInteraction(long nodeID, RESULT result, TYPE type, int
+            blockID) {
+        Interaction interaction = getInteraction(nodeID, result, type, blockID);
+        return interactions.remove(interaction);
+    }
+
 }
