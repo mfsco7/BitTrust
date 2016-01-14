@@ -225,6 +225,21 @@ public class BTObserver implements Control {
                 //                System.out.println();
                 //                ((BitNode) (Network.get(i)))
                 // .printInteractions();
+
+                System.out.println("Reputations");
+
+                for (Neighbor neighbor : ((BitTorrent) (Network.get(i).getProtocol(pid)))
+                        .getCache()) {
+                    if (neighbor != null && neighbor.node != null && ((BitTorrent) (Network.get
+                            (i).getProtocol(pid))).alive(neighbor.node)) {
+
+                        System.out.println(neighbor.node.getID() + " " + node.getDirectTrust
+                                (neighbor.node.getID()));
+                    }
+                }
+                System.out.println();
+
+
             } else {
                 //System.out.println("[OBS] t " + CommonState.getTime() + "\t
                 // pc " + "0" + "\t n " + "0");

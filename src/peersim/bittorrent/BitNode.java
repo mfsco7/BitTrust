@@ -2,6 +2,7 @@ package peersim.bittorrent;
 
 import peersim.config.Configuration;
 import peersim.core.GeneralNode;
+import peersim.util.IncrementalFreq;
 import utils.Interaction;
 import utils.Interaction.RESULT;
 import utils.Interaction.TYPE;
@@ -10,8 +11,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 
-import static utils.Interaction.RESULT.GOOD;
-import static utils.Interaction.RESULT.SENT;
+import static utils.Interaction.RESULT.*;
 
 /**
  * This class belongs to the package ${PACKAGE_NAME} and is for being use on
@@ -401,4 +401,24 @@ public class BitNode extends GeneralNode {
         return interactions.remove(interaction);
     }
 
+    public IncrementalFreq getNumberInteractionsByResult(long nodeID) {
+        IncrementalFreq freq = new IncrementalFreq();
+
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID) {
+                freq.add(interaction.getResult().ordinal());
+            }
+        }
+
+        return freq;
+    }
+
+    public double getDirectTrust(long nodeID) {
+        //TODO remove the older interactions
+        IncrementalFreq freq = getNumberInteractionsByResult(nodeID);
+        int alpha = freq.getFreq(GOOD.ordinal());
+        int beta = freq.getFreq(NO_REPLY.ordinal()) + freq.getFreq(BAD.ordinal());
+
+        return (alpha + 1d) / (alpha + beta + 2);
+    }
 }
