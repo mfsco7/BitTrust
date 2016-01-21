@@ -1,5 +1,6 @@
 package peersim.bittorrent;
 
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import peersim.config.Configuration;
 import peersim.core.GeneralNode;
 import peersim.util.IncrementalFreq;
@@ -20,13 +21,21 @@ import static utils.Interaction.RESULT.*;
 public class BitNode extends GeneralNode {
 
     private static final String PAR_PROT = "protocol";
+    private static final String PAR_MAX_INTER = "max_interactions";
+    private static final String PAR_DIRECT_WEIGHT = "direct_weight";
+    private static final String PAR_THRESH_ITP = "itp_thresh";
+    private static final String PAR_THRESH_CRP = "crp_thresh";
     private final int pid;
+    private final int maxNumInteractionsPerPeer;
+    private final int directWeight;
+    private final int itp_threshold;
+    private final int crp_threshold;
     FileWriter file_interaction;
     FileWriter file_blocks;
     FileWriter file_requests;
     FileWriter messagesFile;
     private ArrayList<Interaction> interactions;
-    private HashMap<Long, HashMap<Long, Integer>> nodeInteractions;
+    private HashMap<Long, HashMap<Long, Double>> nodesDirectTrust;
 
     //    /**
     //     * Used to construct the prototype node. This class currently does not
@@ -40,8 +49,12 @@ public class BitNode extends GeneralNode {
     public BitNode(String prefix) {
         super(prefix);
         pid = Configuration.getPid(prefix + "." + PAR_PROT);
+        maxNumInteractionsPerPeer = Configuration.getInt(prefix + "." + PAR_MAX_INTER, 6240);
+        directWeight = Configuration.getInt(prefix + "." + PAR_DIRECT_WEIGHT, 75);
+        itp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_ITP, 15);
+        crp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_CRP, 15);
         interactions = new ArrayList<>();
-        nodeInteractions = new HashMap<>();
+        nodesDirectTrust = new HashMap<>();
         try {
             file_interaction = new FileWriter
                     ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/interaction_" + getID() + "" +
@@ -233,8 +246,7 @@ public class BitNode extends GeneralNode {
         return null;
     }
 
-    public Interaction getInteraction(long nodeID, RESULT result, TYPE type, int
-            blockID) {
+    public Interaction getInteraction(long nodeID, RESULT result, TYPE type, int blockID) {
         for (Interaction interaction : interactions) {
             if (interaction.getNodeID() == nodeID && interaction.getType() == type &&
                     interaction.getResult() == result && interaction.getBlockID() == blockID) {
@@ -360,7 +372,7 @@ public class BitNode extends GeneralNode {
         BitNode result;
         result = (BitNode) super.clone();
         result.interactions = new ArrayList<>();
-        result.nodeInteractions = new HashMap<>();
+        result.nodesDirectTrust = new HashMap<>();
         try {
             result.file_interaction = new FileWriter("csv/interactions_" + result.getID() + ".csv");
             result.file_interaction.write("time;nodeID;result;type;blockID\n");
@@ -385,8 +397,8 @@ public class BitNode extends GeneralNode {
      * @param nodeID
      * @param nodeInteractions
      */
-    public void addNodeInteractions(long nodeID, HashMap<Long, Integer> nodeInteractions) {
-        this.nodeInteractions.put(nodeID, nodeInteractions);
+    public void addNodeInteractions(long nodeID, HashMap<Long, Double> nodeInteractions) {
+        this.nodesDirectTrust.put(nodeID, nodeInteractions);
     }
 
     public boolean removeInteraction(long time, long nodeID, RESULT result, TYPE type, int
@@ -395,17 +407,16 @@ public class BitNode extends GeneralNode {
         return interactions.remove(interaction);
     }
 
-    public boolean removeInteraction(long nodeID, RESULT result, TYPE type, int
-            blockID) {
+    public boolean removeInteraction(long nodeID, RESULT result, TYPE type, int blockID) {
         Interaction interaction = getInteraction(nodeID, result, type, blockID);
         return interactions.remove(interaction);
     }
 
-    public IncrementalFreq getNumberInteractionsByResult(long nodeID) {
+    public IncrementalFreq getNumberInteractionsByResult(long nodeID, TYPE type) {
         IncrementalFreq freq = new IncrementalFreq();
 
         for (Interaction interaction : interactions) {
-            if (interaction.getNodeID() == nodeID) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type) {
                 freq.add(interaction.getResult().ordinal());
             }
         }
@@ -415,10 +426,88 @@ public class BitNode extends GeneralNode {
 
     public double getDirectTrust(long nodeID) {
         //TODO remove the older interactions
-        IncrementalFreq freq = getNumberInteractionsByResult(nodeID);
+        IncrementalFreq freq = getNumberInteractionsByResult(nodeID, TYPE.DOWNLOAD);
         int alpha = freq.getFreq(GOOD.ordinal());
         int beta = freq.getFreq(NO_REPLY.ordinal()) + freq.getFreq(BAD.ordinal());
 
         return (alpha + 1d) / (alpha + beta + 2);
+    }
+
+    public double getReputation(long nodeID) {
+        IncrementalFreq freq = getNumberInteractionsByResult(nodeID, TYPE.DOWNLOAD);
+        return ((double) freq.getN()) / maxNumInteractionsPerPeer;
+    }
+
+    public double[] getDirectPercentages(long nodeID) {
+        //TODO remove the older interactions
+        IncrementalFreq freq = getNumberInteractionsByResult(nodeID, TYPE.DOWNLOAD);
+        int alpha = freq.getFreq(GOOD.ordinal());
+        int beta = freq.getFreq(NO_REPLY.ordinal()) + freq.getFreq(BAD.ordinal());
+
+        return new double[]{(alpha + 1d) / (alpha + beta + 2),
+                (alpha+beta) / maxNumInteractionsPerPeer};
+    }
+
+    /**
+     * Obtain indirect trust from others relative to the specific node
+     * @param nodeID
+     * @return
+     */
+    public double[] getIndirectPercentages(long nodeID) {
+        DescriptiveStatistics stats = new DescriptiveStatistics();
+        DescriptiveStatistics stats2 = new DescriptiveStatistics();
+        HashMap<Long, double[]> percentage = new HashMap<>();
+
+        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+            if (neighbor.node.getID() != nodeID) {
+                double[] percentages = neighbor.node.getDirectPercentages(nodeID);
+                stats.addValue(percentages[0]);
+                stats2.addValue(percentages[1]);
+                percentage.put(neighbor.node.getID(), percentages);
+            }
+        }
+
+        double medianDTP = stats.getPercentile(50);
+        double medianRP = stats2.getPercentile(50);
+
+        DescriptiveStatistics statsITP = new DescriptiveStatistics();
+        DescriptiveStatistics statsCRP = new DescriptiveStatistics();
+
+        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+            if (neighbor.node.getID() != nodeID ) {
+                double[] percentages = percentage.get(neighbor.node.getID());
+                if( Math.abs(medianDTP - percentages[0]) <= itp_threshold) {
+                    statsITP.addValue(percentages[0]);
+                }
+                if (Math.abs(medianRP - percentages[1]) <= crp_threshold) {
+                    statsCRP.addValue(percentages[1]);
+                }
+            }
+        }
+        return new double[]{statsITP.getMean(), statsCRP.getMean()};
+    }
+
+    public double getTTP(long nodeID, double DTP, double ITP) {
+        return (directWeight / 100 * DTP) + ((1 - directWeight) / 100) * ITP;
+    }
+
+    public double getTRP(long nodeID, double RP, double CRP) {
+        return (directWeight / 100 * RP) + ((1 - directWeight) / 100) * CRP;
+    }
+
+    public double[] getPercentages(long nodeID) {
+        double[] directPercentages = getDirectPercentages(nodeID);
+        double[] indirectPercentages = getIndirectPercentages(nodeID);
+
+        double DTP = directPercentages[0];
+        double RP = directPercentages[1];
+
+        double ITP = indirectPercentages[0];
+        double CRP = indirectPercentages[1];
+
+        double TTP = getTTP(nodeID, DTP, ITP);
+        double TRP = getTRP(nodeID, RP, CRP);
+
+        return new double[]{TTP, TRP};
     }
 }

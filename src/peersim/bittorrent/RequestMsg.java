@@ -10,8 +10,8 @@ import java.util.HashMap;
  */
 public class RequestMsg extends IntMsg {
 
-    private HashMap<Long, Integer> download;
-    private HashMap<Long, Integer> upload;
+    private HashMap<Long, Double> download;
+    private HashMap<Long, Double> upload;
 
     /**
      * Constructor of a RequestMsg
@@ -22,18 +22,18 @@ public class RequestMsg extends IntMsg {
      * @param upload
      */
     public RequestMsg(Node sender, int value, long time,
-                      HashMap<Long, Integer> download, HashMap<Long, Integer>
+                      HashMap<Long, Double> download, HashMap<Long, Double>
                               upload) {
         super(8, sender, value, time);
         this.download = download;
         this.upload = upload;
     }
 
-    public HashMap<Long, Integer> getDownload() {
+    public HashMap<Long, Double> getDownload() {
         return download;
     }
 
-    public HashMap<Long, Integer> getUpload() {
+    public HashMap<Long, Double> getUpload() {
         return upload;
     }
 }

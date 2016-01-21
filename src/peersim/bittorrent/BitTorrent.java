@@ -564,7 +564,7 @@ public class BitTorrent implements EDProtocol {
                             // ev = new IntMsg(REQUEST, node, pendingRequest[i], CommonState
                             // .getTime());
                             ev = new RequestMsg(node, pendingRequest[i], CommonState.getTime(),
-                                    downloadInteractions, null);
+                                    null, null);
                             latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
                             EDSimulator.add(latency, ev, sender, pid);
 
@@ -635,7 +635,7 @@ public class BitTorrent implements EDProtocol {
                                 HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
                                         .getSortedInteractions(DOWNLOAD);
                                 ev = new RequestMsg(node, block, CommonState.getTime(),
-                                        downloadInteractions, null);
+                                        null, null);
                                 latency = ((Transport) node.getProtocol(tid)).getLatency(node,
                                         sender);
                                 EDSimulator.add(latency, ev, sender, pid);
@@ -918,7 +918,7 @@ public class BitTorrent implements EDProtocol {
                 requestToServe.enqueue(value, sender, requestTime);
 
                 long id = sender.getID();
-                HashMap<Long, Integer> download = requestMsg.getDownload();
+                HashMap<Long, Double> download = requestMsg.getDownload();
                 ((BitNode) node).addNodeInteractions(id, download);
 
                 try {
@@ -1736,7 +1736,7 @@ public class BitTorrent implements EDProtocol {
                 HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
                         .getSortedInteractions(DOWNLOAD);
                 RequestMsg ev = new RequestMsg(node, block, CommonState.getTime(),
-                        downloadInteractions, null);
+                        null, null);
                 long latency = ((Transport) node.getProtocol(tid)).getLatency(node, cache[sender]
                         .node);
                 EDSimulator.add(latency, ev, cache[sender].node, pid);
