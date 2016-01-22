@@ -55,21 +55,6 @@ public class BitNode extends GeneralNode {
         crp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_CRP, 15);
         interactions = new ArrayList<>();
         nodesDirectTrust = new HashMap<>();
-        try {
-            file_interaction = new FileWriter
-                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/interaction_" + getID() + "" +
-                    ".csv");
-            file_blocks = new FileWriter("/home/aferreira/Documentos/Hyrax/BitTrust/csv/blocks_" +
-                    getID() + "" +
-                    ".csv");
-            file_requests = new FileWriter
-                    ("/home/aferreira/Documentos/Hyrax/BitTrust/csv/requests_" +
-                    getID() + ".csv");
-            messagesFile = new FileWriter("csv/messages_" + getID() + ".csv");
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
