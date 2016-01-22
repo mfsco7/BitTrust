@@ -116,10 +116,7 @@ public class BTObserver implements Control {
                     if (fileStatus == 16) {
                         numberOfCompletedPieces++;
                     }
-//                    if (i == 2) System.out.println(j+": "+fileStatus);
                 }
-
-
 
 				/*
                  * Put here the output lines of the Observer. An example is
@@ -137,62 +134,19 @@ public class BTObserver implements Control {
                         .nPiecesDown + "\t up: " + ((BitTorrent) (Network.get
                         (i).getProtocol(pid))).nPiecesUp + " time: " +
                         CommonState.getTime());
-                //System.out.println("[OBS] t " + CommonState.getTime() + "\t
-                // pc " + numberOfCompletedPieces + "\t n " + ((peersim
-                // .BitTorrent)(Network.get(i).getProtocol(pid)))
-                // .getThisNodeID());
-                //				System.out.println("OBS:");
-                //				((BitNode) Network.get(i))
-                // .printInteractions();
-                //                System.out.print("OBS: neighbors ");
-                //                for (Neighbor neighbor : ((BitTorrent)
-                // (Network.get(i)
-                //						.getProtocol(pid))).getCache()) {
-                //                    if (neighbor != null && neighbor
-                // .node!=null) {
-                //
-                //                    System.out.print(neighbor.node.getID()
-                // + " ");
-                //                    }
-                //                }
-                //                System.out.println();
+
+
                 BitNode node = ((BitNode) (Network.get(i)));
-                //                for (Neighbor neighbor : ((BitTorrent)
-                // (Network.get(i)
-                //                        .getProtocol(pid))).getCache()) {
-                //                    if (neighbor != null && neighbor.node
-                // != null) {
-                //                        node.printInteractions(neighbor
-                // .node.getID(),
-                //                                Interaction.TYPE.DOWNLOAD);
-                //                        neighbor
-                //                 .node
-                // .printInteractions();
-                //                        System
-                //                 .out.print(neighbor
-                // .node.getID() + " ");
-                //                        node.printInteractions
-                // (neighbor
-                //                 .node.getID(),
-                //                                Interaction.TYPE
-                // .UPLOAD);
 
-                //                    }
-                //                }
-
-//                if (node.getID() == 18 || node.getID() == 20) {
-//                    for (Map.Entry<Long, Integer> entry : node
-//                            .getSortedInteractions(DOWNLOAD)
-//                            .entrySet()) {
-//                        System.out.println(entry.getKey() + ":" + entry
-//                                .getValue());
-//                    }
-//                    for (Map.Entry<Long, Integer> entry : node
-//                            .getSortedInteractions(UPLOAD)
-//                            .entrySet()) {
-//                        System.out.println(entry.getKey() + ":" + entry
-//                                .getValue());
-//                    }
+                /*if (node.getID() == 18 || node.getID() == 20) {
+                    for (Map.Entry<Long, Integer> entry : node.getSortedInteractions(DOWNLOAD)
+                            .entrySet()) {
+                        System.out.println(entry.getKey() + ":" + entry.getValue());
+                    }
+                    for (Map.Entry<Long, Integer> entry : node.getSortedInteractions(UPLOAD)
+                            .entrySet()) {
+                        System.out.println(entry.getKey() + ":" + entry.getValue());
+                    }*/
 
                 //TODO count download and upload interactions at same time
                     node.printResumedInteractions(DOWNLOAD);
@@ -207,24 +161,6 @@ public class BTObserver implements Control {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-/*
-                int dim = 0;
-                Queue incPieces = ((BitTorrent) (Network.get(i).getProtocol(pid))).incomingPieces;
-
-                for (int head = incPieces.head; head < incPieces.head+incPieces.dim;head++) {
-                    Request req =incPieces.queue[head%incPieces.maxSize];
-                    if(req.sender.getID()==2) {
-                        dim++;
-                        System.out.println(req.id +" - "+ req.time);
-                    }
-                }
-
-                if(dim!=0)System.out.println("dim "+dim);
-*/
-
-                //                System.out.println();
-                //                ((BitNode) (Network.get(i)))
-                // .printInteractions();
 
                 System.out.println("Reputations");
 
@@ -233,8 +169,9 @@ public class BTObserver implements Control {
                     if (neighbor != null && neighbor.node != null && ((BitTorrent) (Network.get
                             (i).getProtocol(pid))).alive(neighbor.node)) {
 
-                        System.out.println(neighbor.node.getID() + " " + node.getDirectTrust
-                                (neighbor.node.getID()));
+                        System.out.println(neighbor.node.getID() + " " + node
+                                .getDirectPercentages
+                                (neighbor.node.getID())[0]);
                     }
                 }
                 System.out.println();
@@ -253,11 +190,6 @@ public class BTObserver implements Control {
         // prints the average number of neighbors per peer
         System.out.println("Avg number of neighbors per peer: " +
                 neighborStats.getAverage());
-        //        if (nodeStatusStats.getFreq(0) == 0) {
-        //            for (int, i = 0; i < 9000; i++) {
-        //                System.out.println();
-        //            }
-        //        }
         return false;
     }
 }
