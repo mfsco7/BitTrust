@@ -3,6 +3,8 @@ package peersim.bittorrent;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import peersim.config.Configuration;
 import peersim.core.GeneralNode;
+import peersim.edsim.EDSimulator;
+import peersim.transport.Transport;
 import peersim.util.IncrementalFreq;
 import utils.Interaction;
 import utils.Interaction.RESULT;
@@ -20,6 +22,16 @@ import static utils.Interaction.RESULT.*;
  */
 public class BitNode extends GeneralNode {
 
+    private static final int UNCHOKE = 3;
+
+    private static final float ex = 0.95f;
+    private static final float vg = 0.8f;
+    private static final float gd = 0.65f;
+    private static final float sat = 0.5f;
+    private static final float poor = 0.25f;
+
+    private static final int maxToUnchoke = 4;
+
     private static final String PAR_PROT = "protocol";
     private static final String PAR_MAX_INTER = "max_interactions";
     private static final String PAR_DIRECT_WEIGHT = "direct_weight";
@@ -30,6 +42,8 @@ public class BitNode extends GeneralNode {
     private final int directWeight;
     private final int itp_threshold;
     private final int crp_threshold;
+
+
     FileWriter file_interaction;
     FileWriter file_blocks;
     FileWriter file_requests;
@@ -325,180 +339,62 @@ public class BitNode extends GeneralNode {
     }
 
     public void unchokingAlgorithm() {
-        float ex = 0.95f;
-        float vg = 0.8f;
-        float gd = 0.65f;
-        float sat = 0.5f;
-        float poor = 0.25f;
+        Integer nUnchoked = 0;
 
-        int maxToUnchoke = 4;
-        int nUnchoked = 0;
+        HashMap<Neighbor, double[]> nodePercentages = new HashMap<>();
 
-        HashMap<BitNode, double[]> nodePercentages = new HashMap<>();
+        float[][] quality = {//1st quality control for TTP, others for TRP
+                {ex, ex, vg, gd},   //Phase I
+                {vg, ex, vg, gd},
+                {gd, ex, vg, gd},
+                {ex, sat, poor, poor}, //Phase II
+                {vg, sat, poor, poor},
+                {gd, sat, poor, poor},
+                {sat, ex, vg, gd},  //Phase III
+                {poor, ex, vg, gd},
+                {sat, sat, poor, poor}, //Phase IV
+                {poor, sat, poor, poor}
+        };
 
-        // Phase I
+        //Create BitPeerList
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
             double[] percentages = getPercentages(neighbor.node.getID());
-            nodePercentages.put(neighbor.node, percentages);
+            nodePercentages.put(neighbor, percentages);
+        }
+
+        //Unchoke nodes for each quality control
+        for (int i = 0; i < quality.length && nUnchoked < maxToUnchoke; i++) {
+            qualityControl(nodePercentages, nUnchoked, quality[i]);
+        }
+    }
+
+    int qualityControl(HashMap<Neighbor, double[]> nodePercentages, Integer nUnchoked, float[] quality) {
+        for (Map.Entry<Neighbor,double[]> entry : nodePercentages.entrySet()) {
+            Neighbor neighbor = entry.getKey();
+            double[] percentages = entry.getValue();
 
             double TTP = percentages[0];
             double TRP = percentages[1];
 
-            if (TTP >= ex && (TRP >= ex || TRP >= vg || TRP >= gd)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
+            if (TTP >= quality[0] &&
+                    (TRP >= quality[1] || TRP >= quality[2] || TRP >= quality[3])) {
+                unchoke(neighbor);
+                nodePercentages.remove(neighbor); //BitPeerList.Remove
+
+                if (++nUnchoked >= maxToUnchoke) {
                     break;
-                    //TODO remove break
                 }
             }
         }
+        return nUnchoked;
+    }
 
-        for (BitNode node : nodePercentages.keySet()) {
-            double[] percentages = nodePercentages.get(node);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-            if (TTP >= vg && (TRP >= ex || TRP >= vg || TRP >= gd)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
-
-        for (BitNode node : nodePercentages.keySet()) {
-            double[] percentages = nodePercentages.get(node);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-            if (TTP >= gd && (TRP >= ex || TRP >= vg || TRP >= gd)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
-
-        // Phase II
-        for (BitNode node : nodePercentages.keySet()) {
-            double[] percentages = nodePercentages.get(node);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-            if (TTP >= ex && (TRP >= sat || TRP >= poor)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
-
-        for (BitNode node : nodePercentages.keySet()) {
-            double[] percentages = nodePercentages.get(node);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-            if (TTP >= vg && (TRP >= sat || TRP >= poor)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
-
-        for (BitNode node : nodePercentages.keySet()) {
-            double[] percentages = nodePercentages.get(node);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-            if (TTP >= gd && (TRP >= sat || TRP >= poor)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
-
-
-        // Phase III
-        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            double[] percentages = getPercentages(neighbor.node.getID());
-            nodePercentages.put(neighbor.node, percentages);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-
-            if (TTP >= sat && (TRP >= ex || TRP >= vg || TRP >= gd)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
-
-        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            double[] percentages = getPercentages(neighbor.node.getID());
-            nodePercentages.put(neighbor.node, percentages);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-
-            if (TTP >= poor && (TRP >= ex || TRP >= vg || TRP >= gd)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
-
-        //Phase IV
-        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            double[] percentages = getPercentages(neighbor.node.getID());
-            nodePercentages.put(neighbor.node, percentages);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-
-            if (TTP >= sat && (TRP >= sat || TRP >= poor)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
-
-        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            double[] percentages = getPercentages(neighbor.node.getID());
-            nodePercentages.put(neighbor.node, percentages);
-
-            double TTP = percentages[0];
-            double TRP = percentages[1];
-
-            if (TTP >= poor && (TRP >= sat || TRP >= poor)) {
-                //        8: Unchoke(p);
-                //        9: BitPeerList.Remove(p);
-                if (++nUnchoked < maxToUnchoke) {
-                    break;
-                    //TODO remove break
-                }
-            }
-        }
+    void unchoke(Neighbor neighbor) {
+        neighbor.status = 1;
+        Object msg = new SimpleMsg(UNCHOKE, this);
+        int tid = ((BitTorrent) getProtocol(pid)).tid;
+        long latency = ((Transport) getProtocol(tid)).getLatency(this, neighbor.node);
+        EDSimulator.add(latency, msg, neighbor.node, pid);
+        neighbor.justSent();
     }
 }
