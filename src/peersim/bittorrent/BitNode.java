@@ -1,6 +1,7 @@
 package peersim.bittorrent;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.apache.commons.math3.stat.descriptive.rank.Median;
 import peersim.config.Configuration;
 import peersim.core.GeneralNode;
 import peersim.edsim.EDSimulator;
@@ -29,14 +30,9 @@ public class BitNode extends GeneralNode {
     private static final String PAR_PROT = "protocol";
     private static final String PAR_MAX_INTER = "max_interactions";
     private static final String PAR_DIRECT_WEIGHT = "direct_weight";
-    private static final String PAR_THRESH_ITP = "itp_thresh";
-    private static final String PAR_THRESH_CRP = "crp_thresh";
     private final int pid;
     private final int maxNumInteractionsPerPeer;
     private final float directWeight;
-    private final float itp_threshold;
-    private final float crp_threshold;
-
 
     FileWriter file_interaction;
     FileWriter file_blocks;
@@ -60,8 +56,6 @@ public class BitNode extends GeneralNode {
         pid = Configuration.getPid(prefix + "." + PAR_PROT);
         maxNumInteractionsPerPeer = Configuration.getInt(prefix + "." + PAR_MAX_INTER, 624);
         directWeight = Configuration.getInt(prefix + "." + PAR_DIRECT_WEIGHT, 60) / 100f;
-        itp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_ITP, 25) / 100f;//25 -> 2xMAD
-        crp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_CRP, 25) / 100f;//25 -> 2xMAD
         interactions = new ArrayList<>();
         nodesDirectTrust = new HashMap<>();
     }
@@ -298,21 +292,38 @@ public class BitNode extends GeneralNode {
         double medianDTP = stats.getPercentile(50);
         double medianRP = stats2.getPercentile(50);
 
+        double madDTP = getMAD(stats.getValues(), medianDTP);
+        double madRP = getMAD(stats2.getValues(), medianRP);
+
         DescriptiveStatistics statsITP = new DescriptiveStatistics();
         DescriptiveStatistics statsCRP = new DescriptiveStatistics();
 
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
             if (neighbor.node != null && neighbor.node.getID() != nodeID) {
                 double[] percentages = percentage.get(neighbor.node.getID());
-                if (Math.abs(medianDTP - percentages[0]) <= itp_threshold) {
+                if (Math.abs(medianDTP - percentages[0]) <= madDTP) {
                     statsITP.addValue(percentages[0]);
                 }
-                if (Math.abs(medianRP - percentages[1]) <= crp_threshold) {
+                if (Math.abs(medianRP - percentages[1]) <= madRP) {
                     statsCRP.addValue(percentages[1]);
                 }
             }
         }
         return new double[]{statsITP.getMean(), statsCRP.getMean()};
+    }
+
+    /**
+     * Compute the median absolute deviation of a array.
+     * @param values array of double
+     * @return the median absolute deviation of a array
+     */
+    public double getMAD(double [] values, double medianValue){
+        double [] temp = new double[values.length];
+        Median m = new Median();
+        for(int i=0 ; i<values.length ;i++){
+            temp[i] = Math.abs(values[i] - medianValue);
+        }
+        return m.evaluate(temp); //return the median of temp
     }
 
     public double getTTP(double DTP, double ITP) {
@@ -363,7 +374,7 @@ public class BitNode extends GeneralNode {
 
         HashMap<Neighbor, double[]> nodePercentages = new HashMap<>();
 
-        float[][] quality = {//1st quality control for TTP, others for TRP
+        float[][] quality = { //1st quality control for TTP, 2nd for TRP: {TTP, TRP}
                 /* Phase I   */ {exTrust, exRate}, {exTrust, vgRate}, {exTrust, gdRate},
                 /*           */ {vgTrust, exRate}, {vgTrust, vgRate}, {vgTrust, gdRate},
                 /*           */ {gdTrust, exRate}, {gdTrust, vgRate}, {gdTrust, gdRate},
