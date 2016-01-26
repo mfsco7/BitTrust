@@ -24,12 +24,6 @@ public class BitNode extends GeneralNode {
 
     private static final int UNCHOKE = 3;
 
-    private static final float ex = 0.95f;
-    private static final float vg = 0.8f;
-    private static final float gd = 0.65f;
-    private static final float sat = 0.5f;
-    private static final float poor = 0.25f;
-
     private static final int maxToUnchoke = 4;
 
     private static final String PAR_PROT = "protocol";
@@ -352,21 +346,34 @@ public class BitNode extends GeneralNode {
     }
 
     public void unchokingAlgorithm() {
+
+        final float exTrust = 0.91f;
+        final float vgTrust = 0.81f;
+        final float gdTrust = 0.71f;
+        final float satTrust = 0.61f;
+        final float poorTrust = 0.5f;
+
+        final float exRate = 0.81f;
+        final float vgRate = 0.61f;
+        final float gdRate = 0.41f;
+        final float satRate = 0.21f;
+        final float poorRate = 0;
+
         Integer nUnchoked = 0;
 
         HashMap<Neighbor, double[]> nodePercentages = new HashMap<>();
 
         float[][] quality = {//1st quality control for TTP, others for TRP
-                {ex, ex, vg, gd},   //Phase I
-                {vg, ex, vg, gd},
-                {gd, ex, vg, gd},
-                {ex, sat, poor, poor}, //Phase II
-                {vg, sat, poor, poor},
-                {gd, sat, poor, poor},
-                {sat, ex, vg, gd},  //Phase III
-                {poor, ex, vg, gd},
-                {sat, sat, poor, poor}, //Phase IV
-                {poor, sat, poor, poor}};
+                /* Phase I   */ {exTrust, exRate}, {exTrust, vgRate}, {exTrust, gdRate},
+                /*           */ {vgTrust, exRate}, {vgTrust, vgRate}, {vgTrust, gdRate},
+                /*           */ {gdTrust, exRate}, {gdTrust, vgRate}, {gdTrust, gdRate},
+                /* Phase II  */ {exTrust, satRate}, {exTrust, poorRate},
+                /*           */ {vgTrust, satRate}, {vgTrust, poorRate},
+                /*           */ {gdTrust, satRate}, {gdTrust, poorRate},
+                /* Phase III */ {satTrust, exRate}, {satTrust, vgRate}, {satTrust, gdRate},
+                /*           */ {poorTrust, exRate}, {poorTrust, vgRate}, {poorTrust, gdRate},
+                /* Phase IV  */ {satTrust, satRate}, {satTrust, poorRate},
+                /*           */ {poorTrust, satRate}, {poorTrust, poorRate}};
 
         //Create BitPeerList
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
@@ -389,8 +396,7 @@ public class BitNode extends GeneralNode {
             double TTP = percentages[0];
             double TRP = percentages[1];
 
-            if (TTP >= quality[0] && (TRP >= quality[1] || TRP >= quality[2] || TRP >=
-                    quality[3])) {
+            if (TTP >= quality[0] && TRP >= quality[1]) {
                 unchoke(neighbor);
                 nodePercentages.remove(neighbor); //BitPeerList.Remove
 
