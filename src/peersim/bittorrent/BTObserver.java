@@ -154,14 +154,6 @@ public class BTObserver implements Control {
                     node.printResumedInteractions(UPLOAD);
 //                }
 
-                try {
-                    node.file_requests.flush();
-                    node.file_blocks.flush();
-                    node.messagesFile.flush();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
                 System.out.println("Reputations");
 
                 for (Neighbor neighbor : ((BitTorrent) (Network.get(i).getProtocol(pid)))
@@ -169,10 +161,19 @@ public class BTObserver implements Control {
                     if (neighbor != null && neighbor.node != null && ((BitTorrent) (Network.get
                             (i).getProtocol(pid))).alive(neighbor.node)) {
 
-                        System.out.println(neighbor.node.getID() + " " + node
-                                .getDirectPercentages
-                                (neighbor.node.getID())[0]);
+                        node.getPercentages(neighbor.node.getID());
+//                        System.out.println(neighbor.node.getID() + ": " + percentages[0] + ";\t"+
+//                                percentages[1]);
                     }
+                }
+
+                try {
+                    node.file_requests.flush();
+                    node.file_blocks.flush();
+                    node.messagesFile.flush();
+                    node.reputationFile.flush();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
                 System.out.println();
 

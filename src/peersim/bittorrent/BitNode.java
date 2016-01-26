@@ -39,15 +39,16 @@ public class BitNode extends GeneralNode {
     private static final String PAR_THRESH_CRP = "crp_thresh";
     private final int pid;
     private final int maxNumInteractionsPerPeer;
-    private final int directWeight;
-    private final int itp_threshold;
-    private final int crp_threshold;
+    private final float directWeight;
+    private final float itp_threshold;
+    private final float crp_threshold;
 
 
     FileWriter file_interaction;
     FileWriter file_blocks;
     FileWriter file_requests;
     FileWriter messagesFile;
+    FileWriter reputationFile;
     private ArrayList<Interaction> interactions;
     private HashMap<Long, HashMap<Long, Double>> nodesDirectTrust;
 
@@ -63,10 +64,10 @@ public class BitNode extends GeneralNode {
     public BitNode(String prefix) {
         super(prefix);
         pid = Configuration.getPid(prefix + "." + PAR_PROT);
-        maxNumInteractionsPerPeer = Configuration.getInt(prefix + "." + PAR_MAX_INTER, 6240);
-        directWeight = Configuration.getInt(prefix + "." + PAR_DIRECT_WEIGHT, 75);
-        itp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_ITP, 15);
-        crp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_CRP, 15);
+        maxNumInteractionsPerPeer = Configuration.getInt(prefix + "." + PAR_MAX_INTER, 624);
+        directWeight = Configuration.getInt(prefix + "." + PAR_DIRECT_WEIGHT, 60) / 100f;
+        itp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_ITP, 25) / 100f;//25 -> 2xMAD
+        crp_threshold = Configuration.getInt(prefix + "." + PAR_THRESH_CRP, 25) / 100f;//25 -> 2xMAD
         interactions = new ArrayList<>();
         nodesDirectTrust = new HashMap<>();
     }
@@ -212,6 +213,9 @@ public class BitNode extends GeneralNode {
 
             result.messagesFile = new FileWriter("csv/messages_" + result.getID() + ".csv");
             result.messagesFile.write("Time;Sender;Type\n");
+
+            result.reputationFile = new FileWriter("csv/reputation_" + result.getID() + ".csv");
+            result.reputationFile.write("Node;DTP;RP;ITP;CRP;TTP;TRP\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -271,12 +275,15 @@ public class BitNode extends GeneralNode {
         int alpha = freq.getFreq(GOOD.ordinal());
         int beta = freq.getFreq(NO_REPLY.ordinal()) + freq.getFreq(BAD.ordinal());
 
-        return new double[]{(alpha + 1d) / (alpha + beta + 2),
-                (alpha+beta) / maxNumInteractionsPerPeer};
+        double DTP = (alpha + 1d) / (alpha + beta + 2);
+        //TODO reanalyse double cast
+        double RP = (alpha + beta) / (double) maxNumInteractionsPerPeer;
+        return new double[]{DTP, RP};
     }
 
     /**
      * Obtain indirect trust from others relative to the specific node
+     *
      * @param nodeID
      * @return
      */
@@ -286,7 +293,7 @@ public class BitNode extends GeneralNode {
         HashMap<Long, double[]> percentage = new HashMap<>();
 
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            if (neighbor.node.getID() != nodeID) {
+            if (neighbor.node != null && neighbor.node.getID() != nodeID) {
                 double[] percentages = neighbor.node.getDirectPercentages(nodeID);
                 stats.addValue(percentages[0]);
                 stats2.addValue(percentages[1]);
@@ -301,9 +308,9 @@ public class BitNode extends GeneralNode {
         DescriptiveStatistics statsCRP = new DescriptiveStatistics();
 
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            if (neighbor.node.getID() != nodeID ) {
+            if (neighbor.node != null && neighbor.node.getID() != nodeID) {
                 double[] percentages = percentage.get(neighbor.node.getID());
-                if( Math.abs(medianDTP - percentages[0]) <= itp_threshold) {
+                if (Math.abs(medianDTP - percentages[0]) <= itp_threshold) {
                     statsITP.addValue(percentages[0]);
                 }
                 if (Math.abs(medianRP - percentages[1]) <= crp_threshold) {
@@ -314,12 +321,12 @@ public class BitNode extends GeneralNode {
         return new double[]{statsITP.getMean(), statsCRP.getMean()};
     }
 
-    public double getTTP(long nodeID, double DTP, double ITP) {
-        return (directWeight / 100 * DTP) + ((1 - directWeight) / 100) * ITP;
+    public double getTTP(double DTP, double ITP) {
+        return (directWeight * DTP) + ((1 - directWeight) * ITP);
     }
 
-    public double getTRP(long nodeID, double RP, double CRP) {
-        return (directWeight / 100 * RP) + ((1 - directWeight) / 100) * CRP;
+    public double getTRP(double RP, double CRP) {
+        return (directWeight * RP) + ((1 - directWeight) * CRP);
     }
 
     public double[] getPercentages(long nodeID) {
@@ -332,9 +339,15 @@ public class BitNode extends GeneralNode {
         double ITP = indirectPercentages[0];
         double CRP = indirectPercentages[1];
 
-        double TTP = getTTP(nodeID, DTP, ITP);
-        double TRP = getTRP(nodeID, RP, CRP);
+        double TTP = getTTP(DTP, ITP);
+        double TRP = getTRP(RP, CRP);
 
+        try {
+            reputationFile.write(nodeID + ";" + DTP + ";" + RP + ";" + ITP + ";" + CRP + ";" + TTP +
+                    ";" + TRP + "\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return new double[]{TTP, TRP};
     }
 
@@ -353,8 +366,7 @@ public class BitNode extends GeneralNode {
                 {sat, ex, vg, gd},  //Phase III
                 {poor, ex, vg, gd},
                 {sat, sat, poor, poor}, //Phase IV
-                {poor, sat, poor, poor}
-        };
+                {poor, sat, poor, poor}};
 
         //Create BitPeerList
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
@@ -368,16 +380,17 @@ public class BitNode extends GeneralNode {
         }
     }
 
-    int qualityControl(HashMap<Neighbor, double[]> nodePercentages, Integer nUnchoked, float[] quality) {
-        for (Map.Entry<Neighbor,double[]> entry : nodePercentages.entrySet()) {
+    int qualityControl(HashMap<Neighbor, double[]> nodePercentages, Integer nUnchoked, float[]
+            quality) {
+        for (Map.Entry<Neighbor, double[]> entry : nodePercentages.entrySet()) {
             Neighbor neighbor = entry.getKey();
             double[] percentages = entry.getValue();
 
             double TTP = percentages[0];
             double TRP = percentages[1];
 
-            if (TTP >= quality[0] &&
-                    (TRP >= quality[1] || TRP >= quality[2] || TRP >= quality[3])) {
+            if (TTP >= quality[0] && (TRP >= quality[1] || TRP >= quality[2] || TRP >=
+                    quality[3])) {
                 unchoke(neighbor);
                 nodePercentages.remove(neighbor); //BitPeerList.Remove
 
