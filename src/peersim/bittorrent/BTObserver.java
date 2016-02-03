@@ -30,9 +30,6 @@ import peersim.util.IncrementalStats;
 
 import java.io.IOException;
 
-import static utils.Interaction.TYPE.DOWNLOAD;
-import static utils.Interaction.TYPE.UPLOAD;
-
 /**
  * This {@link Control} provides a way to keep track of some
  * parameters of the peersim.BitTorrent network.
@@ -138,23 +135,12 @@ public class BTObserver implements Control {
 
                 BitNode node = ((BitNode) (Network.get(i)));
 
-                /*if (node.getID() == 18 || node.getID() == 20) {
-                    for (Map.Entry<Long, Integer> entry : node.getSortedInteractions(DOWNLOAD)
-                            .entrySet()) {
-                        System.out.println(entry.getKey() + ":" + entry.getValue());
-                    }
-                    for (Map.Entry<Long, Integer> entry : node.getSortedInteractions(UPLOAD)
-                            .entrySet()) {
-                        System.out.println(entry.getKey() + ":" + entry.getValue());
-                    }*/
+//                    node.printResumedInteractions(DOWNLOAD);
+//                System.out.println("----------------------------");
+//                    node.printResumedInteractions(UPLOAD);
+////                }
 
-                //TODO count download and upload interactions at same time
-                    node.printResumedInteractions(DOWNLOAD);
-                System.out.println("----------------------------");
-                    node.printResumedInteractions(UPLOAD);
-//                }
-
-                System.out.println("Reputations");
+//                System.out.println("Reputations");
 
                 for (Neighbor neighbor : ((BitTorrent) (Network.get(i).getProtocol(pid)))
                         .getCache()) {
@@ -162,8 +148,6 @@ public class BTObserver implements Control {
                             (i).getProtocol(pid))).alive(neighbor.node)) {
 
                         node.getPercentages(neighbor.node.getID());
-//                        System.out.println(neighbor.node.getID() + ": " + percentages[0] + ";\t"+
-//                                percentages[1]);
                     }
                 }
 
@@ -175,8 +159,6 @@ public class BTObserver implements Control {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                System.out.println();
-
 
             } else {
                 //System.out.println("[OBS] t " + CommonState.getTime() + "\t

@@ -23,6 +23,7 @@ import static utils.Interaction.RESULT.*;
  */
 public class BitNode extends GeneralNode {
 
+    private static final int CHOKE = 2;
     private static final int UNCHOKE = 3;
 
     private static final int maxToUnchoke = 4;
@@ -396,6 +397,11 @@ public class BitNode extends GeneralNode {
         for (int i = 0; i < quality.length && nUnchoked < maxToUnchoke; i++) {
             qualityControl(nodePercentages, nUnchoked, quality[i]);
         }
+
+        //Choke the remaining neighbours
+        for (Neighbor neighbor : nodePercentages.keySet()) {
+            choke(neighbor);
+        }
     }
 
     int qualityControl(HashMap<Neighbor, double[]> nodePercentages, Integer nUnchoked, float[]
@@ -425,6 +431,16 @@ public class BitNode extends GeneralNode {
         int tid = ((BitTorrent) getProtocol(pid)).tid;
         long latency = ((Transport) getProtocol(tid)).getLatency(this, neighbor.node);
         EDSimulator.add(latency, msg, neighbor.node, pid);
+        neighbor.justSent();
+    }
+
+    void choke(Neighbor neighbor) {
+        neighbor.status = 0;
+        Object ev = new SimpleMsg(CHOKE, this);
+        int tid = ((BitTorrent) getProtocol(pid)).tid;
+        long latency = ((Transport) getProtocol(tid)).getLatency(this,
+                neighbor.node);
+        EDSimulator.add(latency, ev, neighbor.node, pid);
         neighbor.justSent();
     }
 }
