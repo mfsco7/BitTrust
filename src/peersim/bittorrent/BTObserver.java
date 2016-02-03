@@ -142,14 +142,14 @@ public class BTObserver implements Control {
 
 //                System.out.println("Reputations");
 
-                for (Neighbor neighbor : ((BitTorrent) (Network.get(i).getProtocol(pid)))
-                        .getCache()) {
-                    if (neighbor != null && neighbor.node != null && ((BitTorrent) (Network.get
-                            (i).getProtocol(pid))).alive(neighbor.node)) {
-
-                        node.getPercentages(neighbor.node.getID());
-                    }
-                }
+//                for (Neighbor neighbor : ((BitTorrent) (Network.get(i).getProtocol(pid)))
+//                        .getCache()) {
+//                    if (neighbor != null && neighbor.node != null && ((BitTorrent) (Network.get
+//                            (i).getProtocol(pid))).alive(neighbor.node)) {
+//
+//                        node.getPercentages(neighbor.node.getID());
+//                    }
+//                }
 
                 try {
                     node.file_requests.flush();

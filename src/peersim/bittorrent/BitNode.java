@@ -26,7 +26,7 @@ public class BitNode extends GeneralNode {
     private static final int CHOKE = 2;
     private static final int UNCHOKE = 3;
 
-    private static final int maxToUnchoke = 4;
+    private static final int maxToUnchoke = 3;
 
     private static final String PAR_PROT = "protocol";
     private static final String PAR_MAX_INTER = "max_interactions";
@@ -389,8 +389,10 @@ public class BitNode extends GeneralNode {
 
         //Create BitPeerList
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            double[] percentages = getPercentages(neighbor.node.getID());
-            nodePercentages.put(neighbor, percentages);
+            if (neighbor != null && neighbor.node != null) {
+                double[] percentages = getPercentages(neighbor.node.getID());
+                nodePercentages.put(neighbor, percentages);
+            }
         }
 
         //Unchoke nodes for each quality control
@@ -400,22 +402,26 @@ public class BitNode extends GeneralNode {
 
         //Choke the remaining neighbours
         for (Neighbor neighbor : nodePercentages.keySet()) {
-            choke(neighbor);
+            if (neighbor != null && neighbor.node != null) {
+                choke(neighbor);
+            }
         }
     }
 
     int qualityControl(HashMap<Neighbor, double[]> nodePercentages, Integer nUnchoked, float[]
             quality) {
-        for (Map.Entry<Neighbor, double[]> entry : nodePercentages.entrySet()) {
-            Neighbor neighbor = entry.getKey();
-            double[] percentages = entry.getValue();
+        Iterator<Neighbor> iterator = nodePercentages.keySet().iterator();
+        while (iterator.hasNext()) {
+            Neighbor neighbor = iterator.next();
+            double[] percentages = nodePercentages.get(neighbor);
 
             double TTP = percentages[0];
             double TRP = percentages[1];
 
             if (TTP >= quality[0] && TRP >= quality[1]) {
                 unchoke(neighbor);
-                nodePercentages.remove(neighbor); //BitPeerList.Remove
+//                nodePercentages.remove(neighbor); //BitPeerList.Remove
+                iterator.remove();
 
                 if (++nUnchoked >= maxToUnchoke) {
                     break;
