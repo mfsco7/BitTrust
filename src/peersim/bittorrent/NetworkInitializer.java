@@ -22,6 +22,7 @@ package peersim.bittorrent;/*
  */
 
 import peersim.config.Configuration;
+import peersim.core.CommonState;
 import peersim.core.Control;
 import peersim.core.Network;
 import peersim.core.Node;
@@ -42,7 +43,13 @@ public class NetworkInitializer implements Control {
 	private static final String PAR_PROT="protocol";
 		
 	private static final String PAR_TRANSPORT="transport";
-	
+
+	private static final String PAR_N_BAD_CHUNK="nBadChunk";
+
+	private static final String PAR_N_SLOW="nSlow";
+
+	private static final String PAR_N_FREE_RIDER="nFreeRider";
+
 	private static final int TRACKER = 11;
 	
 	private static final int CHOKE_TIME = 13;
@@ -59,13 +66,21 @@ public class NetworkInitializer implements Control {
 	private final int pid;
 	private final int tid;
 	private NodeInitializer init;
-	
+
+	private final int nBadChunk;
+	private final int nSlow;
+	private final int nFreeRider;
+
 	private Random rnd;
 	
 	public NetworkInitializer(String prefix) {
 		pid = Configuration.getPid(prefix+"."+PAR_PROT);
 		tid = Configuration.getPid(prefix+"."+PAR_TRANSPORT);
 		init = new NodeInitializer(prefix);
+
+		nBadChunk = Configuration.getInt(prefix + "." + PAR_N_BAD_CHUNK);
+		nSlow = Configuration.getInt(prefix + "." + PAR_N_SLOW);
+		nFreeRider = Configuration.getInt(prefix + "." + PAR_N_FREE_RIDER);
 	}
 	
 	public boolean execute() {
@@ -75,15 +90,48 @@ public class NetworkInitializer implements Control {
 		// manca l'inizializzazione del tracker;
 		
 		((BitTorrent)Network.get(0).getProtocol(pid)).initializeTracker();
-		
+
+
 		for(int i=1; i<Network.size(); i++){
 			System.err.println("chiamate ad addNeighbor " + i);
 			((BitTorrent)Network.get(0).getProtocol(pid)).addNeighbor(
 					(BitNode) Network.get(i));
 			init.initialize(Network.get(i));
 		}
+
+		int badChunkLeft = nBadChunk;
+		while (badChunkLeft > 0) {
+			int random = CommonState.r.nextInt(29) + 1;
+			BitNode node =((BitNode) Network.get(random));
+			if (node.isNormal()) {
+				node.setBadChunk();
+				badChunkLeft--;
+			}
+		}
+
+		//TODO timeout did not work
+		int slowLeft = nSlow;
+		while (slowLeft > 0) {
+			int random = CommonState.r.nextInt(29)+1;
+			BitNode node =((BitNode) Network.get(random));
+			if (node.isNormal()) {
+				node.setSlow();
+				slowLeft--;
+			}
+		}
+
+		int freeRidersLeft = nFreeRider;
+		while (freeRidersLeft > 0) {
+			int random = CommonState.r.nextInt(29)+1;
+			BitNode node =((BitNode) Network.get(random));
+			if (node.isNormal()) {
+				node.setFreeRider();
+				freeRidersLeft--;
+			}
+		}
+
 		for(int i=1; i< Network.size(); i++){
-			Node n = Network.get(i);
+			BitNode n = (BitNode) Network.get(i);
 			long latency = ((Transport)n.getProtocol(tid)).getLatency(n,tracker);
 			Object ev = new SimpleMsg(TRACKER, n);
 			EDSimulator.add(latency,ev,tracker,pid);
@@ -97,6 +145,8 @@ public class NetworkInitializer implements Control {
 			EDSimulator.add(120000,ev,n,pid);
 			ev = new SimpleEvent(TRACKERALIVE_TIME);
 			EDSimulator.add(1800000,ev,n,pid);
+
+			System.out.println("Node " + n.getID() + " is " + n.getBehaviour());
 		}
 		return true;
 	}

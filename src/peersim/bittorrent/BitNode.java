@@ -43,6 +43,12 @@ public class BitNode extends GeneralNode {
     private ArrayList<Interaction> interactions;
     private HashMap<Long, HashMap<Long, Double>> nodesDirectTrust;
 
+    enum Behaviour {
+        NORMAL, BAD_CHUNK, SLOW, FREE_RIDER}
+
+    private Behaviour behaviour;
+
+
     //    /**
     //     * Used to construct the prototype node. This class currently does not
     //     * have specific configuration parameters and so the parameter
@@ -59,6 +65,31 @@ public class BitNode extends GeneralNode {
         directWeight = Configuration.getInt(prefix + "." + PAR_DIRECT_WEIGHT, 60) / 100f;
         interactions = new ArrayList<>();
         nodesDirectTrust = new HashMap<>();
+        behaviour = Behaviour.NORMAL;
+    }
+
+    public Behaviour getBehaviour() {
+        return behaviour;
+    }
+
+    public boolean isNormal() {
+        return behaviour == Behaviour.NORMAL;
+    }
+
+    public void setBadChunk() {
+        behaviour = Behaviour.BAD_CHUNK;
+    }
+
+    public void setSlow() {
+        behaviour = Behaviour.SLOW;
+    }
+
+    public boolean isFreeRider() {
+        return behaviour == Behaviour.FREE_RIDER;
+    }
+
+    public void setFreeRider() {
+        behaviour = Behaviour.FREE_RIDER;
     }
 
     private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
@@ -83,6 +114,7 @@ public class BitNode extends GeneralNode {
 
     public boolean addInteraction(long time, long nodeID, RESULT result, TYPE type, int blockID) {
         Interaction interaction = new Interaction(time, nodeID, result, type, blockID);
+        removeOnLimit(nodeID, type);
         interactions.add(interaction);
         try {
             file_interaction.write(time + ";" + nodeID + ";" + result + ";" + type + ";" +
@@ -91,6 +123,26 @@ public class BitNode extends GeneralNode {
             e.printStackTrace();
         }
         return true;
+    }
+
+    public void removeOnLimit(long nodeID, TYPE type) {
+
+        int count = 0;
+        for (Interaction interaction : interactions) {
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type) {
+                count++;
+            }
+        }
+        int toRemove = Math.max(0, count - maxNumInteractionsPerPeer);
+        Iterator<Interaction> iterator = interactions.iterator();
+        while (toRemove > 0 && iterator.hasNext()) {
+
+            Interaction interaction = iterator.next();
+            if (interaction.getNodeID() == nodeID && interaction.getType() == type) {
+                iterator.remove();
+                toRemove--;
+            }
+        }
     }
 
     public boolean turnGoodInteraction(Long time, Long nodeID, TYPE type, int blockID) {
@@ -266,6 +318,7 @@ public class BitNode extends GeneralNode {
 
         double DTP = (alpha + 1d) / (alpha + beta + 2);
         //TODO reanalyse double cast
+        //TODO RP is greater than 1
         double RP = (alpha + beta) / (double) maxNumInteractionsPerPeer;
         return new double[]{DTP, RP};
     }
