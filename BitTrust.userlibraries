@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<eclipse-userlibraries>
+  <library name="commons-math3-3.5">
+    <archive path="/home/aferreira/Documentos/Hyrax/commons-math3-3.5/commons-math3-3.5.jar" />
+    <archive path="/home/aferreira/Documentos/Hyrax/commons-math3-3.5/commons-math3-3.5-javadoc.jar" />
+  </library>
+  <library name="PeerSim">
+    <archive path="/home/aferreira/Documentos/Hyrax/peersim-1.0.5/peersim-1.0.5.jar" />
+    <archive path="/home/aferreira/Documentos/Hyrax/peersim-1.0.5/peersim-doclet.jar" />
+    <archive path="/home/aferreira/Documentos/Hyrax/peersim-1.0.5/jep-2.3.0.jar" />
+    <archive path="/home/aferreira/Documentos/Hyrax/peersim-1.0.5/djep-1.0.0.jar" />
+  </library>
+  <library name="Python 3.4.3 interpreter library" />
+</eclipse-userlibraries>
+
