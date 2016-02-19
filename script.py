@@ -18,7 +18,7 @@ confidence = 0
 #Function to be run at each thread
 def simulate(lock=Lock()):
     global simulation
-    while (confidence < 0.95):
+    while (simulation < 30) or (confidence < 0.95):
         p = Popen(["java", "-cp", libraries, "peersim.Simulator", cfgFile])
         p.wait()
         lock.acquire(timeout=1)# TODO if a thread locks here and confidence already at objective see a workaround
