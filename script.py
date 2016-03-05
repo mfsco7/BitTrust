@@ -1,3 +1,6 @@
+import csv
+from os import mkdir
+from os.path import exists
 from random import randint
 from shutil import copyfile
 from statistics import stdev, mean
@@ -6,9 +9,7 @@ from threading import Thread, Lock
 
 from psutil import Popen, cpu_count
 
-import csv
-
-peersimLibraries = "../peersim-1.0.5/peersim-1.0.5.jar:../peersim-1.0.5/djep-1.0.0.jar:../peersim-1.0.5/jep-2.3.0.jar:../peersim-1.0.5/peersim-doclet.jar"
+peersimLibraries = "../peersim-1.0.5/*"
 commonsmath35Library = "../commons-math3-3.5/commons-math3-3.5.jar"
 bitTrustOutDir = "out/production/BitTrust"
 
@@ -136,6 +137,9 @@ if __name__ == '__main__':
 
     t = []
     locker = Lock()
+
+    if not exists("csv"):
+        mkdir("csv", 0o644)
 
     """ Creates new csv file or overwrites the old """
     with open('csv/simulationTimes.csv', 'w', newline='') as csv_file:
