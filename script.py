@@ -1,4 +1,6 @@
 import csv
+from datetime import datetime
+from math import floor, ceil
 from os import mkdir
 from os.path import exists
 from random import randint
@@ -7,6 +9,8 @@ from statistics import stdev, mean
 from subprocess import PIPE
 from threading import Thread, Lock
 
+from matplotlib.pyplot import plot, savefig
+from numpy import arange
 from psutil import Popen, cpu_count
 
 peersimLibraries = "../peersim-1.0.5/*"
@@ -131,6 +135,44 @@ def calc_interval(down_time):
     return error / mean0
 
 
+def calc_avg(num_group=100):
+    """
+    Process the average of downtimes. For each of the two downtime arrays, it separates the array
+    elements in ``num_group`` groups, and for each group calculates the elements arithmetic mean.
+
+    :type num_group: int
+    :param num_group: Maximum number of groups that will be created
+    :return: The Group Averages for the two downtime arrays
+    """
+    size = len(downtime)
+
+    min_points = floor(size / num_group)
+    max_points = ceil(size / num_group)
+
+    n_cluster_max = size % num_group
+
+    sim = 0
+    x2, y2 = [], []
+    cluster = n_cluster_max * [max_points] + (num_group - n_cluster_max) * [min_points]
+    for nPoints in cluster:
+        x2 += [sum(downtime[sim:sim + nPoints]) / nPoints]
+        y2 += [sum(downtime2[sim:sim + nPoints]) / nPoints]
+        sim += nPoints
+    return x2, y2
+
+
+def plot_graph(x: list, y: list):
+    """
+    Draw the graph from the downtimes and save it to a file
+
+    :param x: Downtime of trust approach
+    :param y: Downtime of original approach
+    """
+    plot(arange(len(x)), x, '.', arange(len(y)), y)
+    time = datetime.now().strftime('%Y%m%d_%H%M%S')
+    savefig("simulation_times_avg" + time + ".png")
+
+
 if __name__ == '__main__':
     nProcessors = cpu_count() - 1
     # nProcessors = 1
@@ -155,5 +197,8 @@ if __name__ == '__main__':
     """ Waits for threads to finish """
     for i in range(nProcessors):
         t[i].join()
+
+    avg_downtime, avg_downtime2 = calc_avg()
+    plot_graph(avg_downtime, avg_downtime2)
 
     print("done")
