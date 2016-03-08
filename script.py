@@ -117,7 +117,7 @@ def run_process(cfg_file="conf/Time-1.conf"):
     return last_time
 
 
-def calc_interval(down_time):
+def calc_interval(down_time: list):
     """
     Computes the Interval Spread from the values contained on down_time. The interval spread is
     calculated by this formula: error / mean(values), with error as z-value * (stdev * sqrt(
@@ -137,12 +137,14 @@ def calc_interval(down_time):
 
 def calc_avg(num_group=100):
     """
-    Process the average of downtimes. For each of the two downtime arrays, it separates the array
-    elements in ``num_group`` groups, and for each group calculates the elements arithmetic mean.
+    Calculates the average of downtime arrays. This method returns a smaller representation of
+    points from two downtime arrays. It first splits each array, independently, in num_groups
+    groups. Then it calculates for each group the average between the values. After this,
+    this method joins and returns the values in the form of two arrays.
 
     :type num_group: int
     :param num_group: Maximum number of groups that will be created
-    :return: The Group Averages for the two downtime arrays
+    :return: Two arrays with the Averages of the two given downtime arrays
     """
     size = len(downtime)
 
