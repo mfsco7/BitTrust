@@ -122,13 +122,15 @@ public class NetworkInitializer implements Control {
 
 		int freeRidersLeft = nFreeRider;
 		while (freeRidersLeft > 0) {
-			int random = CommonState.r.nextInt(29)+1;
+			int random = CommonState.r.nextInt(Network.size()-1)+1;
 			BitNode node =((BitNode) Network.get(random));
 			if (node.isNormal()) {
 				node.setFreeRider();
 				freeRidersLeft--;
 			}
 		}
+
+		((BitTorrent)Network.get(0).getProtocol(pid)).getUnchokingAlgorithm();
 
 		for(int i=1; i< Network.size(); i++){
 			BitNode n = (BitNode) Network.get(i);

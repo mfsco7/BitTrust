@@ -211,6 +211,8 @@ public class BitTorrent implements EDProtocol {
      * @see SimpleEvent#type "Event types"
      */
     private static final int DOWNLOAD_COMPLETED = 18;
+
+    private static final int TIMEOUT = 19;
     /**
      * Defines how much the network can grow with respect to the <tt>network
      * .size</tt>
@@ -367,12 +369,15 @@ public class BitTorrent implements EDProtocol {
      */
     private int numberOfDuplicatedRequests;
 
-    private String unchokingAlgorithm;
+    private Choke unchokingAlgorithm;
+    enum Choke {ORIGINAL,TRUST, TRUST2}
     /**
      * The reference to the tracker node. If equals to <tt>null</tt>, the local
      * node is the tracker.
      */
     private BitNode tracker = null;
+
+    private int timeout = 15000;
 
     /**
      * The default constructor. Reads the configuration file and initializes
@@ -392,7 +397,8 @@ public class BitTorrent implements EDProtocol {
         maxGrowth = (int) Configuration.getInt(prefix + "." + PAR_MAX_GROWTH);
         nMaxNodes = Network.getCapacity() - 1;
         unchokingAlgorithm = Configuration.getString(prefix + "." + PAR_UNCHOKING_ALGORITHM,
-                "original");
+                "original").equals("original") ? Choke.ORIGINAL : Choke.TRUST;
+
     }
 
     public Neighbor[] getCache() {
@@ -443,6 +449,10 @@ public class BitTorrent implements EDProtocol {
      */
     public void setThisNodeID(long id) {
         this.thisNodeID = id;
+    }
+
+    public Choke getUnchokingAlgorithm() {
+        return unchokingAlgorithm;
     }
 
     /**
@@ -577,6 +587,11 @@ public class BitTorrent implements EDProtocol {
                             latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
                             EDSimulator.add(latency, ev, sender, pid);
 
+                            TimeOutEvent toe = new TimeOutEvent(CommonState.getTime(),
+                                    pendingRequest[i], sender);
+                            int timeout = 10000;
+                            EDSimulator.add(timeout, toe, node, pid);
+
                             RequestMsg requestMsg = (RequestMsg) ev;
 
                             try {
@@ -648,6 +663,11 @@ public class BitTorrent implements EDProtocol {
                                 latency = ((Transport) node.getProtocol(tid)).getLatency(node,
                                         sender);
                                 EDSimulator.add(latency, ev, sender, pid);
+
+                                TimeOutEvent toe = new TimeOutEvent(CommonState.getTime(),
+                                        block, sender);
+                                int timeout = 10000;
+                                EDSimulator.add(timeout, toe, node, pid);
 
                                 RequestMsg requestMsg = (RequestMsg)ev;
                                 try {
@@ -924,8 +944,13 @@ public class BitTorrent implements EDProtocol {
                 if (e == null) return;
                 cache[e.peer].isAlive();
 
-                if(!((BitNode) node).isFreeRider()) requestToServe.enqueue(value, sender,
-                        requestTime);
+                if(!((BitNode) node).isFreeRider()) {
+                    requestToServe.enqueue(value, sender, requestTime);
+
+                }
+//                else {
+//                    System.out.println();
+//                }
 
                 long id = sender.getID();
                 HashMap<Long, Double> download = requestMsg.getDownload();
@@ -956,7 +981,8 @@ public class BitTorrent implements EDProtocol {
                         int slowFactor = 100; //Minimum of 1
                         localRate = (maxBandwidth / (nPiecesUp + nPiecesDown)) *(slowFactor/100);
                         bandwidth = Math.min(remoteRate, localRate);
-                        downloadTime = ((16 * 8) / (bandwidth)) * 1000; // in
+                        //TODO downloadTime is 0
+                        downloadTime = (((16 * 8) / (bandwidth)) * 1000); // in
                         // milliseconds
                         latency = ((Transport) node.getProtocol(tid)).getLatency(node, req.sender);
                         EDSimulator.add(latency + downloadTime, ev, req.sender, pid);
@@ -1299,7 +1325,7 @@ public class BitTorrent implements EDProtocol {
                 ev = new SimpleEvent(CHOKE_TIME);
                 EDSimulator.add(10000, ev, node, pid);
 
-                if (unchokingAlgorithm.equals("original")) {
+                if (unchokingAlgorithm == (Choke.ORIGINAL)) {
                     int j = 0;
                 /*I copy the interested nodes in the byBandwidth array*/
                     for (int i = 0; i < swarmSize && byPeer[i].peer != -1; i++) {
@@ -1360,8 +1386,11 @@ public class BitTorrent implements EDProtocol {
                             }
                         }
                     }
-                } else if(unchokingAlgorithm.equals("trust")) {
-                    ((BitNode) node).unchokingAlgorithm();
+                } else if(unchokingAlgorithm == (Choke.TRUST)) {
+//                    ((BitNode) node).unchokingAlgorithm();
+                    ((BitNode) node).unchokingAlgorithm2();
+                } else if (unchokingAlgorithm == Choke.TRUST2) {
+
                 }
 
                 if (n_choke_time % 2 == 0) { //every 20 secs. Used in
@@ -1474,6 +1503,43 @@ public class BitTorrent implements EDProtocol {
             }
             ;
             break;
+
+            case TIMEOUT:
+                TimeOutEvent toe = (TimeOutEvent) event;
+                int blockID = toe.getValue();
+                Node sender = toe.getSender();
+
+                ((BitNode) node).turnBadNOREPLYInteraction(toe.getTime(), sender.getID(),
+                        DOWNLOAD, blockID);
+
+                int t = numberOfDuplicatedRequests;
+                for (Neighbor neighbor : getCache()) {
+
+
+                    if (neighbor != null && neighbor.node != null && neighbor.node.getID() != sender
+                            .getID
+                            ()) {
+                        Element e = search(sender.getID());
+                        if (e != null) { //if I know the sender
+                            cache[e.peer].isAlive();
+
+                            ev = new IntMsg(INTERESTED, node, lastInterested);
+
+                            latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
+                            EDSimulator.add(latency, ev, neighbor.node, pid);
+                            neighbor.justSent();
+
+                        } else {
+                            System.err.println("despite it should never happen, it " + "happened");
+//                            ev = new BitfieldMsg(BITFIELD, true, false, node, status, nPieces);
+//                            latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
+//                            EDSimulator.add(latency, ev, sender, pid);
+//                            nBitfieldSent++;
+                        }
+                    }
+                }
+
+                break;
 
         }
     }
@@ -1762,6 +1828,12 @@ public class BitTorrent implements EDProtocol {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+
+                TimeOutEvent toe = new TimeOutEvent(CommonState.getTime(),
+                        block, cache[sender].node);
+                int timeout = 10000;
+                EDSimulator.add(timeout, toe, node, pid);
+
 
                 if (!((BitNode) node).addInteraction(CommonState.getTime(), cache[sender].node
                         .getID(), SENT, DOWNLOAD, block))

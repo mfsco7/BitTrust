@@ -50,6 +50,7 @@ public class SimpleEvent {
 	*  <li>16 is CHECKALIVE_TIME event</li>
 	*  <li>17 is TRACKERALIVE_TIME event</li>
 	*  <li>18 is DOWNLOAD_COMPLETED event</li>
+	 * <li>19 is TIMEOUT event</li>
 	*</ul></p>
 	*/
 	protected int type;

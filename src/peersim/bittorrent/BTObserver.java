@@ -174,6 +174,10 @@ public class BTObserver implements Control {
         // prints the average number of neighbors per peer
         System.out.println("Avg number of neighbors per peer: " +
                 neighborStats.getAverage());
+
+        if (nodeStatusStats.getFreq(0) == 0) {
+            System.exit(0);
+        }
         return false;
     }
 }

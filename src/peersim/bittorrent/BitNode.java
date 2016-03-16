@@ -26,7 +26,7 @@ public class BitNode extends GeneralNode {
     private static final int CHOKE = 2;
     private static final int UNCHOKE = 3;
 
-    private static final int maxToUnchoke = 3;
+    private static final int maxToUnchoke = 4;
 
     private static final String PAR_PROT = "protocol";
     private static final String PAR_MAX_INTER = "max_interactions";
@@ -148,6 +148,11 @@ public class BitNode extends GeneralNode {
     public boolean turnGoodInteraction(Long time, Long nodeID, TYPE type, int blockID) {
         Interaction interaction = getInteraction(time, nodeID, SENT, type, blockID);
         return interaction != null && interaction.setResult(GOOD);
+    }
+
+    public boolean turnBadNOREPLYInteraction(Long time, Long nodeID, TYPE type, int blockID) {
+        Interaction interaction = getInteraction(time, nodeID, SENT, type, blockID);
+        return interaction != null && interaction.setResult(NO_REPLY);
     }
 
     public Interaction getInteraction(long time, long nodeID, RESULT result, TYPE type, int
@@ -501,5 +506,66 @@ public class BitNode extends GeneralNode {
                 neighbor.node);
         EDSimulator.add(latency, ev, neighbor.node, pid);
         neighbor.justSent();
+    }
+
+    public void unchokingAlgorithm2() {
+        final float trustThreshold = 0.5f;
+
+        HashMap<Neighbor, Double> neighborRates = new HashMap<>(maxToUnchoke);
+        ArrayList<Neighbor> neighborsToChoke = new ArrayList<>();
+
+        //Create BitPeerList
+        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+            if (neighbor != null && neighbor.node != null) {
+                double[] trustAndRate = getPercentages(neighbor.node.getID());
+
+                if (trustAndRate[0] >= trustThreshold) {
+//                    if (neighborRates.size() < maxToUnchoke) {
+//                        neighborRates.put(neighbor, trustAndRate[1]);
+//                    } else {
+//
+//                        Map.Entry<Neighbor, Double> worse = neighborRates.entrySet().stream()
+//                                .min((neighbor1, neighbor2) -> Double.compare(neighbor1.getValue(),
+//                                                                            neighbor2.getValue()))
+//                                .get();
+//
+//                        if (worse != null && worse.getValue() < trustAndRate[1]) {
+//                            neighborRates.remove(worse.getKey());
+//                            neighborsToChoke.add(worse.getKey());
+//                            neighborRates.put(neighbor, trustAndRate[1]);
+//
+//                        }
+//
+//                    }
+                    neighborRates.put(neighbor, trustAndRate[1]);
+                } else neighborsToChoke.add(neighbor);
+            }
+        }
+
+        for (int i = 0; i < maxToUnchoke; i++) {
+            Map.Entry<Neighbor, Double> better = null;
+            for (Map.Entry<Neighbor, Double> entry : neighborRates.entrySet()) {
+                if (better == null || (better.getValue() < entry.getValue()) && (((BitTorrent)entry
+                        .getKey().node.getProtocol(pid)).getPeerStatus() == 0 )){
+                    better = entry;
+                }
+            }
+            if (better != null) {
+                neighborRates.remove(better.getKey());
+
+                unchoke(better.getKey());
+            }
+        }
+
+//        neighborRates.keySet().forEach(this::unchoke);
+//        for (Neighbor neighbor : neighborRates.keySet()) {
+//            unchoke(neighbor);
+//        }
+        neighborsToChoke.addAll(neighborRates.keySet());
+//        neighborsToChoke.forEach(this::choke);
+        for (Neighbor neighbor : neighborsToChoke) {
+            choke(neighbor);
+        }
+
     }
 }
