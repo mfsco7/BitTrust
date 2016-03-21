@@ -28,6 +28,7 @@ import peersim.core.Network;
 import peersim.core.Node;
 import peersim.edsim.EDSimulator;
 import peersim.transport.Transport;
+import peersim.util.IncrementalFreq;
 
 import java.util.Random;
 
@@ -41,7 +42,7 @@ public class NetworkInitializer implements Control {
 	* @config
 	*/
 	private static final String PAR_PROT="protocol";
-		
+
 	private static final String PAR_TRANSPORT="transport";
 
 	private static final String PAR_N_BAD_CHUNK="nBadChunk";
@@ -51,17 +52,17 @@ public class NetworkInitializer implements Control {
 	private static final String PAR_N_FREE_RIDER="nFreeRider";
 
 	private static final int TRACKER = 11;
-	
+
 	private static final int CHOKE_TIME = 13;
-	
+
 	private static final int OPTUNCHK_TIME = 14;
-	
+
 	private static final int ANTISNUB_TIME = 15;
-	
+
 	private static final int CHECKALIVE_TIME = 16;
-	
+
 	private static final int TRACKERALIVE_TIME = 17;
-	
+
 	/** Protocol identifier, obtained from config property */
 	private final int pid;
 	private final int tid;
@@ -72,7 +73,7 @@ public class NetworkInitializer implements Control {
 	private final int nFreeRider;
 
 	private Random rnd;
-	
+
 	public NetworkInitializer(String prefix) {
 		pid = Configuration.getPid(prefix+"."+PAR_PROT);
 		tid = Configuration.getPid(prefix+"."+PAR_TRANSPORT);
@@ -82,13 +83,13 @@ public class NetworkInitializer implements Control {
 		nSlow = Configuration.getInt(prefix + "." + PAR_N_SLOW);
 		nFreeRider = Configuration.getInt(prefix + "." + PAR_N_FREE_RIDER);
 	}
-	
+
 	public boolean execute() {
 		int completed;
 		Node tracker = Network.get(0);
-		
+
 		// manca l'inizializzazione del tracker;
-		
+
 		((BitTorrent)Network.get(0).getProtocol(pid)).initializeTracker();
 
 
@@ -120,11 +121,20 @@ public class NetworkInitializer implements Control {
 			}
 		}
 
-		int freeRidersLeft = nFreeRider;
-		while (freeRidersLeft > 0) {
+		int nSeeders = getPeerStatus().getFreq(1);
+
+        int freeRidersLeft = Math.min(nFreeRider, Network.size() - 1 - nSeeders);
+
+        if (nFreeRider > Network.size() - nSeeders - 1) {
+            System.err.println("Number of FreeRiders settled is more than the nodes available," +
+                    " only " + (Network.size() - nSeeders - 1) + " nodes were configured as " +
+                    "FreeRiders");
+        }
+        while (freeRidersLeft > 0) {
 			int random = CommonState.r.nextInt(Network.size()-1)+1;
 			BitNode node =((BitNode) Network.get(random));
-			if (node.isNormal()) {
+			BitTorrent bitTorrent = (BitTorrent) node.getProtocol(pid);
+			if (node.isNormal() && bitTorrent.getPeerStatus() == 0) {
 				node.setFreeRider();
 				freeRidersLeft--;
 			}
@@ -152,5 +162,24 @@ public class NetworkInitializer implements Control {
 		}
 		return true;
 	}
-	
+
+	/**
+	 * Number of leechers and seeders on network
+	 */
+	IncrementalFreq getPeerStatus() {
+		IncrementalFreq nodeStatusStats = new IncrementalFreq();
+
+		// cycles from 1, since the node 0 is the tracker
+		for (int i = 1; i < Network.size(); ++i) {
+
+			// stats on number of leechers and seeders in the network
+			// and consequently also on number of completed files in the network
+			nodeStatusStats.add(((BitTorrent) (Network.get(i).getProtocol
+					(pid))).getPeerStatus());
+
+		}
+
+		return nodeStatusStats;
+	}
+
 	}
