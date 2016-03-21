@@ -396,9 +396,21 @@ public class BitTorrent implements EDProtocol {
                 "." + PAR_DUP_REQ);
         maxGrowth = (int) Configuration.getInt(prefix + "." + PAR_MAX_GROWTH);
         nMaxNodes = Network.getCapacity() - 1;
-        unchokingAlgorithm = Configuration.getString(prefix + "." + PAR_UNCHOKING_ALGORITHM,
-                "original").equals("original") ? Choke.ORIGINAL : Choke.TRUST;
-
+        String tmp = Configuration.getString(prefix + "." + PAR_UNCHOKING_ALGORITHM, "original");
+        switch (tmp) {
+            case "original":
+                unchokingAlgorithm = Choke.ORIGINAL;
+                break;
+            case "trust":
+                unchokingAlgorithm = Choke.TRUST;
+                break;
+            case "trust2":
+                unchokingAlgorithm = Choke.TRUST2;
+                break;
+            default:
+                unchokingAlgorithm = Choke.ORIGINAL;
+                break;
+        }
     }
 
     public Neighbor[] getCache() {
@@ -1325,72 +1337,75 @@ public class BitTorrent implements EDProtocol {
                 ev = new SimpleEvent(CHOKE_TIME);
                 EDSimulator.add(10000, ev, node, pid);
 
-                if (unchokingAlgorithm == (Choke.ORIGINAL)) {
-                    int j = 0;
+                switch (unchokingAlgorithm) {
+                    case ORIGINAL:
+                        int j = 0;
                 /*I copy the interested nodes in the byBandwidth array*/
-                    for (int i = 0; i < swarmSize && byPeer[i].peer != -1; i++) {
-                        if (cache[byPeer[i].peer].interested > 0) {
-                            byBandwidth[j] = byPeer[i]; //shallow copy
-                            j++;
+                        for (int i = 0; i < swarmSize && byPeer[i].peer != -1; i++) {
+                            if (cache[byPeer[i].peer].interested > 0) {
+                                byBandwidth[j] = byPeer[i]; //shallow copy
+                                j++;
+                            }
                         }
-                    }
 
 				/*It ensures that in the next 20sec, if there are less nodes
                 interested than now, those in surplus will not be ordered. */
-                    for (; j < swarmSize; j++) {
-                        byBandwidth[j] = null;
-                    }
-                    sortByBandwidth();
-                    int optimistic = 3;
-                    int luckies[] = new int[3];
-                    try { // It takes the first three neighbors
-                        luckies[0] = byBandwidth[0].peer;
-                        optimistic--;
-                        luckies[1] = byBandwidth[1].peer;
-                        optimistic--;
-                        luckies[2] = byBandwidth[2].peer;
-                    } catch (NullPointerException e) { // If not enough peer in
-                        // byBandwidth it chooses the other randomly
-                        for (int z = optimistic; z > 0; z--) {
-                            int lucky = CommonState.r.nextInt(nNodes);
-                            while (cache[byPeer[lucky].peer].status == 1 && alive
-                                    (cache[byPeer[lucky].peer].node) &&
-                                    cache[byPeer[lucky].peer].interested == 0)//
-                                // until the lucky peer is already unchoked or not
-                                // interested
-                                lucky = CommonState.r.nextInt(nNodes);
-                            luckies[3 - z] = byPeer[lucky].peer;
+                        for (; j < swarmSize; j++) {
+                            byBandwidth[j] = null;
                         }
-                    }
-                    for (int i = 0; i < swarmSize; i++) { // I perform the chokes
-                        // and the unchokes
-                        if ((i == luckies[0] || i == luckies[1] || i == luckies[2]) && alive
-                                (cache[i].node) && cache[i].status != 2) { //the unchokes
-                            cache[i].status = 1;
-                            ev = new SimpleMsg(UNCHOKE, node);
-                            latency = ((Transport) node.getProtocol(tid)).getLatency(node,
-                                    cache[i].node);
-                            EDSimulator.add(latency, ev, cache[i].node, pid);
-                            cache[i].justSent();
-                            //System.out.println("average time, unchoked:
-                            // "+cache[i].node.getID());
-                        } else { // the chokes
-                            if (alive(cache[i].node) && (cache[i].status == 1 || cache[i].status
-                                    == 2)) {
-                                cache[i].status = 0;
-                                ev = new SimpleMsg(CHOKE, node);
+                        sortByBandwidth();
+                        int optimistic = 3;
+                        int luckies[] = new int[3];
+                        try { // It takes the first three neighbors
+                            luckies[0] = byBandwidth[0].peer;
+                            optimistic--;
+                            luckies[1] = byBandwidth[1].peer;
+                            optimistic--;
+                            luckies[2] = byBandwidth[2].peer;
+                        } catch (NullPointerException e) { // If not enough peer in
+                            // byBandwidth it chooses the other randomly
+                            for (int z = optimistic; z > 0; z--) {
+                                int lucky = CommonState.r.nextInt(nNodes);
+                                while (cache[byPeer[lucky].peer].status == 1 && alive
+                                        (cache[byPeer[lucky].peer].node) &&
+                                        cache[byPeer[lucky].peer].interested == 0)//
+                                    // until the lucky peer is already unchoked or not
+                                    // interested
+                                    lucky = CommonState.r.nextInt(nNodes);
+                                luckies[3 - z] = byPeer[lucky].peer;
+                            }
+                        }
+                        for (int i = 0; i < swarmSize; i++) { // I perform the chokes
+                            // and the unchokes
+                            if ((i == luckies[0] || i == luckies[1] || i == luckies[2]) && alive
+                                    (cache[i].node) && cache[i].status != 2) { //the unchokes
+                                cache[i].status = 1;
+                                ev = new SimpleMsg(UNCHOKE, node);
                                 latency = ((Transport) node.getProtocol(tid)).getLatency(node,
                                         cache[i].node);
                                 EDSimulator.add(latency, ev, cache[i].node, pid);
                                 cache[i].justSent();
+                                //System.out.println("average time, unchoked:
+                                // "+cache[i].node.getID());
+                            } else { // the chokes
+                                if (alive(cache[i].node) && (cache[i].status == 1 || cache[i]
+                                        .status == 2)) {
+                                    cache[i].status = 0;
+                                    ev = new SimpleMsg(CHOKE, node);
+                                    latency = ((Transport) node.getProtocol(tid)).getLatency
+                                            (node, cache[i].node);
+                                    EDSimulator.add(latency, ev, cache[i].node, pid);
+                                    cache[i].justSent();
+                                }
                             }
                         }
-                    }
-                } else if(unchokingAlgorithm == (Choke.TRUST)) {
-//                    ((BitNode) node).unchokingAlgorithm();
-                    ((BitNode) node).unchokingAlgorithm2();
-                } else if (unchokingAlgorithm == Choke.TRUST2) {
-
+                        break;
+                    case TRUST:
+                        ((BitNode) node).unchokingAlgorithm();
+                        break;
+                    case TRUST2:
+                        ((BitNode) node).unchokingAlgorithm2();
+                        break;
                 }
 
                 if (n_choke_time % 2 == 0) { //every 20 secs. Used in
