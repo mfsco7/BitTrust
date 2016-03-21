@@ -47,10 +47,18 @@ public class NodeInitializer{
 	private static final String PAR_NEWER_DISTR="newer_distr";
 	
 	/**
-	 *	The percentage of seeders in the network.
+	 *	The percentage of seeders in the network. If this parameter is not specified on the
+	 *	config file, -1 is set and {@link #PAR_SEEDER_N} is used instead.
 	 *	@config
 	 */
 	private static final String PAR_SEEDER_DISTR="seeder_distr";
+
+	/**
+	 *	The Number of seeders in the network. This parameter is used if {@link #PAR_SEEDER_DISTR}
+	 *	is not defined or -1 is settled.
+	 *	@config
+	 */
+	private static final String PAR_SEEDER_N="seeder_number";
 
 	/**
 	 *	The percentage of nodes with no downloaded pieces,
@@ -60,10 +68,16 @@ public class NodeInitializer{
 	
 	/**
 	 *	The percentage of seeder nodes,
-	 *	as defined in {@see #PAR_SEEDER_DISTR}.
+	 *	as defined in {@link #PAR_SEEDER_DISTR}.
 	 */
 	private int seederDistr;
-	
+
+	/**
+	 *	The number of seeder nodes,
+	 *	as defined in {@link #PAR_SEEDER_N}.
+	 */
+	private int seederNumber;
+
 	/**
 	 *	The peersim.BitTorrent protocol ID.
 	 */	
@@ -74,10 +88,11 @@ public class NodeInitializer{
 	 *	from the configuration file.
 	 *	@param prefix the configuration prefix for this class
 	 */
-	public NodeInitializer(String prefix){
+	NodeInitializer(String prefix){
 		pid = Configuration.getPid(prefix+"."+PAR_PROT);
 		newerDistr = Configuration.getInt(prefix+"."+PAR_NEWER_DISTR);
-		seederDistr = Configuration.getInt(prefix+"."+PAR_SEEDER_DISTR);
+		seederDistr = Configuration.getInt(prefix+"."+PAR_SEEDER_DISTR, -1);
+		if (seederDistr == -1) seederNumber = Configuration.getInt(prefix + "." + PAR_SEEDER_N, 1);
 	}
 	
 	/**
@@ -156,8 +171,12 @@ public class NodeInitializer{
 	 */
 	private int getProbability(){
 		int value = CommonState.r.nextInt(100);
-		if((value+1)<=seederDistr)
+		if ((seederDistr > -1) && (value + 1) <= seederDistr) {
 			return 100;
+		} else if (seederDistr == -1 && seederNumber > 0){
+			seederNumber--;
+			return 100;
+		}
 		value = CommonState.r.nextInt(100);
 		if((value+1)<=newerDistr){
 			return 0; // A newer peer, with probability newer_distr
