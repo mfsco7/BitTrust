@@ -29,8 +29,6 @@ min_interval_range = 0.05
 mis = min_interval_range / 2  # Min interval spread
 interval_spread = {}
 
-downtime = {'FREE_RIDER': [], 'NORMAL': []}
-
 
 def simulate(lock):
     """ Function that each thread will run. It will run one simulation with our trust algorithm
@@ -68,7 +66,8 @@ def simulate(lock):
                     if interval_spread[key] < mis:
                         interval_small = True
 
-            with open('csv/simulationTimes.csv', 'a+', newline='') as csv_file2:
+            with open('csv/simulationTimes' + algorithm + '.csv', 'a+', newline='') as \
+                    csv_file2:
                 writer2 = csv.writer(csv_file2, delimiter=';')
 
                 writer2.writerow([time for time in last_time.values()] +
@@ -213,16 +212,20 @@ if __name__ == '__main__':
     algorithms = ["original", "trust", "trust2"]
 
     if not exists("csv"):
-        mkdir("csv", 0o644)
-
-    """ Creates new csv file or overwrites the old """
-    with open('csv/simulationTimes.csv', 'w', newline='') as csv_file:
-        writer = csv.writer(csv_file, delimiter=';')
-        writer.writerow(['TrustTime', 'TrustSpread', 'NoTrustTime', 'NoTrustSpread'])
+        mkdir("csv", 0o744)
 
     for algorithm in algorithms:
         t = []
         simulation = 0
+        downtime = {'FREE_RIDER': [], 'NORMAL': []}
+        # folder_name = "csv"
+        # if not exists(folder_name):
+        #     mkdir(folder_name, 0o744)
+
+        """ Creates new csv file or overwrites the old """
+        with open("csv" + '/simulationTimes' + algorithm + '.csv', 'w', newline='') as csv_file:
+            writer = csv.writer(csv_file, delimiter=';')
+            writer.writerow(['NormalTime', 'FreeRiderTime', 'NormalSpread', 'FreeRiderSpread'])
 
         """ Create threads to control simulation """
         for i in range(nProcessors):
