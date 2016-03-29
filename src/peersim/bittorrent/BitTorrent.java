@@ -29,6 +29,7 @@ import peersim.edsim.EDProtocol;
 import peersim.edsim.EDSimulator;
 import peersim.transport.Transport;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
 
@@ -1174,6 +1175,14 @@ public class BitTorrent implements EDProtocol {
                         System.out.println("FILE COMPLETED for peer " + node.getID() + " at time "
                                 + CommonState.getTime());
                         this.peerStatus = 1;
+
+                        try ( FileWriter fileWriter = new FileWriter("csv/s" + CommonState.r
+                                        .getLastSeed() + ".csv", true)) {
+                            fileWriter.write(node.getID() + ";" + ((BitNode) node).getBehaviour()
+                                    + ";" + CommonState.getTime() + "\n");
+                        } catch (IOException e1) {
+                            e1.printStackTrace();
+                        }
                     }
 
 					/*	I set the currentPiece to the lastInterested. Then I

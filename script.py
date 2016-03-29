@@ -1,4 +1,3 @@
-import csv
 from datetime import datetime
 from math import floor, ceil
 from os import mkdir
@@ -13,6 +12,8 @@ from matplotlib.pyplot import plot, savefig
 from numpy import arange
 from psutil import Popen, cpu_count
 
+import csv
+
 peersimLibraries = "../peersim-1.0.5/*"
 commonsmath35Library = "../commons-math3-3.5/commons-math3-3.5.jar"
 bitTrustOutDir = "out/production/BitTrust"
@@ -26,11 +27,9 @@ confidence = 0.95
 zvalue = 1.96
 min_interval_range = 0.05
 mis = min_interval_range / 2  # Min interval spread
-interval_spread = 1
-interval_spread2 = 1
+interval_spread = {}
 
-downtime = []
-downtime2 = []
+downtime = {'FREE_RIDER': [], 'NORMAL': []}
 
 
 def simulate(lock):
@@ -42,50 +41,63 @@ def simulate(lock):
     :return: Nothing
     """
 
-    global simulation, downtime, downtime2, interval_spread, interval_spread2
-    while (simulation < 30) or (interval_spread > mis) or (interval_spread2 > mis):
+    global simulation, downtime, interval_spread
+    interval_small = False
+    while (simulation < 30) or (not interval_small):
         try:
             lock.acquire(timeout=3)
             sim = simulation
             print("simulation " + str(sim) + " starting")
 
             rand_seed = randint(1, 2 ** 63 - 1)
-            cfg_file2 = generate_conf_file(rand_seed, sim, "trust")
-            cfg_file3 = generate_conf_file(rand_seed, sim, "original")
+            cfg_file2 = generate_conf_file(rand_seed, sim)
             simulation += 1
             lock.release()
 
-            last_time = run_process(cfg_file2)
-            last_time2 = run_process(cfg_file3)
+            # last_time = 0
+            last_time = run_process(cfg_file2, rand_seed)
+            # last_time = {'FREE_RIDER': randint(0, 7 ** 7), 'NORMAL': randint(0, 7 ** 7)}
 
             lock.acquire(timeout=3)
 
             """ see and change confidence here """
-            downtime += [last_time]
-            downtime2 += [last_time2]
-            if len(downtime) > 2:
-                interval_spread = calc_interval(downtime)
-                interval_spread2 = calc_interval(downtime2)
+            for key in last_time.keys():
+                downtime[key] += [last_time[key]]
+                if len(downtime[key]) > 1:
+                    interval_spread[key] = calc_interval(downtime[key])
+                    if interval_spread[key] < mis:
+                        interval_small = True
 
             with open('csv/simulationTimes.csv', 'a+', newline='') as csv_file2:
-                writer2 = csv.writer(csv_file2, delimiter=';',
-                                     quotechar='|', quoting=csv.QUOTE_MINIMAL)
-                writer2.writerow([last_time, interval_spread, last_time2,
-                                  interval_spread2])
+                writer2 = csv.writer(csv_file2, delimiter=';')
+
+                writer2.writerow([time for time in last_time.values()] +
+                                 [amplitude for amplitude in interval_spread.values()])
             print("simulation " + str(sim) + " finishes")
             lock.release()
+
         except TimeoutError:
             lock.release()
 
 
-def generate_conf_file(rand_seed=1234567890, sim=0, algorithm="trust"):
+def is_interval_small():
+    """
+    Check, for all types of nodes, if the interval amplitude is smaller than it is desired
+    :return:  True if interval amplitude is smaller, False otherwise
+    """
+    for interval in interval_spread.values():
+        if interval > mis:
+            return False
+    return True
+
+
+def generate_conf_file(rand_seed=1234567890, sim=0):
     """
     Make new configuration file based on template cfgFile. It will take a integer to
     be a random seed parameter and produce a file for passing to peersim simulator.
 
     :param rand_seed: Integer to be used as random seed
     :param sim: Simulation Number
-    :param algorithm: Name of algorithm to be used. Can be 'trust' or 'original'
     :return: Names of Configuration files
     """
     cfg_file2 = "conf/Time" + algorithm + str(sim) + ".conf"
@@ -98,23 +110,41 @@ def generate_conf_file(rand_seed=1234567890, sim=0, algorithm="trust"):
     return cfg_file2
 
 
-def run_process(cfg_file="conf/Time-1.conf"):
+def run_process(cfg_file="conf/Time-1.conf", seed=1234567890):
     """
-    Creates a new process and waits for it to end. After process termination it will fetch the
+    Creates nodeID new process and waits for it to end. After process termination it will fetch the
     last node download time.
 
     :param cfg_file: Name of configuration file
+    :param seed:
     :return: Time that last node took to fetch the file
     """
     p = Popen(["java", "-cp", libraries, "peersim.Simulator", cfg_file], stdout=PIPE, stderr=PIPE,
               universal_newlines=True)
     p.wait()
 
-    stdout = p.communicate()[0]
-    last_peer = stdout.split(" at time ")[-1]
-    last_time = int(last_peer.split('\n')[0])
+    # stdout = p.communicate()[0]
+    # last_peer = stdout.split(" at time ")[-1]
+    # last_time = int(last_peer.split('\n')[0])
+    #
+    # return last_time
 
-    return last_time
+    down_times = {}
+
+    with open('csv/s' + str(seed) + '.csv', newline='') as csvfile:
+        spam_reader = csv.reader(csvfile, delimiter=';')
+        for row in spam_reader:
+            [_, node_type, time] = row
+            if node_type in down_times:
+                down_times[node_type] += [int(time)]
+            else:
+                down_times[node_type] = [int(time)]
+
+    for key in down_times.keys():
+        print(key, down_times[key])
+        down_times[key] = sum(down_times[key]) / len(down_times[key])
+        print(key, down_times[key])
+    return down_times
 
 
 def calc_interval(down_time: list):
@@ -158,7 +188,7 @@ def calc_avg(num_group=100):
     cluster = n_cluster_max * [max_points] + (num_group - n_cluster_max) * [min_points]
     for nPoints in cluster:
         x2 += [sum(downtime[sim:sim + nPoints]) / nPoints]
-        y2 += [sum(downtime2[sim:sim + nPoints]) / nPoints]
+        # y2 += [sum(downtime2[sim:sim + nPoints]) / nPoints]
         sim += nPoints
     return x2, y2
 
@@ -176,31 +206,34 @@ def plot_graph(x: list, y: list):
 
 
 if __name__ == '__main__':
-    nProcessors = cpu_count() - 1
+    nProcessors = cpu_count()
     # nProcessors = 1
 
-    t = []
     locker = Lock()
+    algorithms = ["original", "trust", "trust2"]
 
     if not exists("csv"):
         mkdir("csv", 0o644)
 
     """ Creates new csv file or overwrites the old """
     with open('csv/simulationTimes.csv', 'w', newline='') as csv_file:
-        writer = csv.writer(csv_file, delimiter=';',
-                            quotechar='|', quoting=csv.QUOTE_MINIMAL)
+        writer = csv.writer(csv_file, delimiter=';')
         writer.writerow(['TrustTime', 'TrustSpread', 'NoTrustTime', 'NoTrustSpread'])
 
-    """ Create threads to control simulation """
-    for i in range(nProcessors):
-        t.append(Thread(target=simulate, args=(locker,)))
-        t[i].start()
+    for algorithm in algorithms:
+        t = []
+        simulation = 0
 
-    """ Waits for threads to finish """
-    for i in range(nProcessors):
-        t[i].join()
+        """ Create threads to control simulation """
+        for i in range(nProcessors):
+            t.append(Thread(target=simulate, args=(locker,)))
+            t[i].start()
 
-    avg_downtime, avg_downtime2 = calc_avg()
-    plot_graph(avg_downtime, avg_downtime2)
+        """ Waits for threads to finish """
+        for i in range(nProcessors):
+            t[i].join()
+
+    # avg_downtime, avg_downtime2 = calc_avg()
+    # plot_graph(avg_downtime, avg_downtime2)
 
     print("done")
