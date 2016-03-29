@@ -70,7 +70,7 @@ def simulate(lock):
                     csv_file2:
                 writer2 = csv.writer(csv_file2, delimiter=';')
 
-                writer2.writerow([time for time in last_time.values()] +
+                writer2.writerow([rand_seed] + [time for time in last_time.values()] +
                                  [amplitude for amplitude in interval_spread.values()])
             print("simulation " + str(sim) + " finishes")
             lock.release()
@@ -140,9 +140,9 @@ def run_process(cfg_file="conf/Time-1.conf", seed=1234567890):
                 down_times[node_type] = [int(time)]
 
     for key in down_times.keys():
-        print(key, down_times[key])
+        # print(key, down_times[key])
         down_times[key] = sum(down_times[key]) / len(down_times[key])
-        print(key, down_times[key])
+        # print(key, down_times[key])
     return down_times
 
 
@@ -222,10 +222,13 @@ if __name__ == '__main__':
         # if not exists(folder_name):
         #     mkdir(folder_name, 0o744)
 
+        print("Simulations with " + algorithm + " started")
+
         """ Creates new csv file or overwrites the old """
         with open("csv" + '/simulationTimes' + algorithm + '.csv', 'w', newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=';')
-            writer.writerow(['NormalTime', 'FreeRiderTime', 'NormalSpread', 'FreeRiderSpread'])
+            writer.writerow(['Random Seed', 'NormalTime', 'FreeRiderTime', 'NormalSpread',
+                             'FreeRiderSpread'])
 
         """ Create threads to control simulation """
         for i in range(nProcessors):
