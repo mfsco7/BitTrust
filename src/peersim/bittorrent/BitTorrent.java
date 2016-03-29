@@ -591,8 +591,8 @@ public class BitTorrent implements EDProtocol {
                         if (alive(cache[senderIndex].node) && swarm[senderIndex][decode
                                 (pendingRequest[i], 0)] == 1) { //If the sender has that
                             // piece
-                            HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-                                    .getSortedInteractions(DOWNLOAD);
+//                            HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
+//                                    .getSortedInteractions(DOWNLOAD);
                             // ev = new IntMsg(REQUEST, node, pendingRequest[i], CommonState
                             // .getTime());
                             ev = new RequestMsg(node, pendingRequest[i], CommonState.getTime(),
@@ -669,8 +669,8 @@ public class BitTorrent implements EDProtocol {
                                 // IntMsg(REQUEST, node, block,
                                 //
                                 // CommonState.getTime());
-                                HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-                                        .getSortedInteractions(DOWNLOAD);
+//                                HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
+//                                        .getSortedInteractions(DOWNLOAD);
                                 ev = new RequestMsg(node, block, CommonState.getTime(),
                                         null, null);
                                 latency = ((Transport) node.getProtocol(tid)).getLatency(node,
@@ -1839,8 +1839,8 @@ public class BitTorrent implements EDProtocol {
                 //                Object ev = new IntMsg(REQUEST, node,
                 // block, CommonState
                 //                        .getTime());
-                HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-                        .getSortedInteractions(DOWNLOAD);
+//                HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
+//                        .getSortedInteractions(DOWNLOAD);
                 RequestMsg ev = new RequestMsg(node, block, CommonState.getTime(),
                         null, null);
                 long latency = ((Transport) node.getProtocol(tid)).getLatency(node, cache[sender]

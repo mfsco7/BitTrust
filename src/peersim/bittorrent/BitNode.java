@@ -92,25 +92,21 @@ public class BitNode extends GeneralNode {
         behaviour = Behaviour.FREE_RIDER;
     }
 
-    private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
-        List list = new LinkedList<>(map.entrySet());
-        // Defined Custom Comparator here
-        Collections.sort(list, new Comparator() {
-            public int compare(Object o1, Object o2) {
-                return ((Comparable) ((Map.Entry) (o1)).getValue()).compareTo(((Map.Entry) (o2))
-                        .getValue());
-            }
-        });
-
-        // Here I am copying the sorted list in HashMap
-        // using LinkedHashMap to preserve the insertion order
-        HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
-        for (Iterator it = list.iterator(); it.hasNext(); ) {
-            Map.Entry entry = (Map.Entry) it.next();
-            sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
-        }
-        return sortedHashMap;
-    }
+//    private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
+//        List list = new LinkedList<>(map.entrySet());
+//        // Defined Custom Comparator here
+//        Collections.sort(list, (o1, o2) -> ((Comparable) ((Map.Entry) (o1)).getValue()).compareTo(((Map.Entry) (o2))
+//                .getValue()));
+//
+//        // Here I am copying the sorted list in HashMap
+//        // using LinkedHashMap to preserve the insertion order
+//        HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
+//        for (Iterator it = list.iterator(); it.hasNext(); ) {
+//            Map.Entry entry = (Map.Entry) it.next();
+//            sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
+//        }
+//        return sortedHashMap;
+//    }
 
     public boolean addInteraction(long time, long nodeID, RESULT result, TYPE type, int blockID) {
         Interaction interaction = new Interaction(time, nodeID, result, type, blockID);
@@ -188,18 +184,18 @@ public class BitNode extends GeneralNode {
         return count;
     }
 
-    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
-
-        HashMap<Long, Integer> sortedInteractions = new HashMap<>();
-
-        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            if (neighbor != null && neighbor.node != null) {
-                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions(neighbor.node
-                        .getID(), type, GOOD));
-            }
-        }
-        return sortByValues(sortedInteractions);
-    }
+//    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
+//
+//        HashMap<Long, Integer> sortedInteractions = new HashMap<>();
+//
+//        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+//            if (neighbor != null && neighbor.node != null) {
+//                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions(neighbor.node
+//                        .getID(), type, GOOD));
+//            }
+//        }
+//        return sortByValues(sortedInteractions);
+//    }
 
     public void printResumedInteractions(TYPE type) {
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
