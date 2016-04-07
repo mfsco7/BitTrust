@@ -586,125 +586,139 @@ public class BitTorrent implements EDProtocol {
                     /* I send to it some of the pending requests not yet
                     satisfied. */
                     int t = numberOfDuplicatedRequests;
-                    for (int i = 4; i >= 0 && t > 0; i--) {
-                        if (pendingRequest[i] == -1) break;
-                        if (alive(cache[senderIndex].node) && swarm[senderIndex][decode
-                                (pendingRequest[i], 0)] == 1) { //If the sender has that
-                            // piece
-//                            HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-//                                    .getSortedInteractions(DOWNLOAD);
-                            // ev = new IntMsg(REQUEST, node, pendingRequest[i], CommonState
-                            // .getTime());
-                            ev = new RequestMsg(node, pendingRequest[i], CommonState.getTime(),
-                                    null, null);
-                            latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
-                            EDSimulator.add(latency, ev, sender, pid);
+                    //TODO 10 is same ceil value that is used on limiting the upload
+                    if (nPiecesDown < 10){
 
-                            TimeOutEvent toe = new TimeOutEvent(CommonState.getTime(),
-                                    pendingRequest[i], sender);
-                            int timeout = 10000;
-                            EDSimulator.add(timeout, toe, node, pid);
-
-                            RequestMsg requestMsg = (RequestMsg) ev;
-
-                            try {
-                                ((BitNode) node).file_requests.write(requestMsg.getTime()+";"+node.getID()
-                                        +";"+requestMsg.getInt()+";"+
-                                        (CommonState.getTime()+latency)+";"+sender.getID()+"\n");
-                            } catch (IOException exception) {
-                                exception.printStackTrace();
-                            }
-
-                            if (!((BitNode) node).addInteraction(CommonState.getTime(), sender
-                                    .getID(), SENT, DOWNLOAD, pendingRequest[i]))
-                                System.err.println("Interaction not added");
-                            cache[senderIndex].justSent();
-                        }
-                        if (!alive(cache[senderIndex].node)) {
-                            System.out.println("unchoke1 rm neigh " + cache[i].node.getID());
-                            removeNeighbor(cache[senderIndex].node);
-                            processNeighborListSize(node, pid);
-                            return;
-                        }
-                        t--;
-                    }
-                    // I request missing blocks to fill the queue
-                    int block = getBlock();
-                    int piece;
-                    while (block != -2) { //while still available request to
-                        // send
-                        if (block < 0) { // No more block to request for the
-                            // current piece
-                            piece = getPiece();
-                            if (piece == -1) { // no more piece to request
-                                break;
-                            }
-                            for (int j = 0; j < swarmSize; j++) {// send the
-                                // interested message to those
-                                // nodes which have that piece
-                                lastInterested = piece;
-                                if (alive(cache[j].node) && swarm[j][piece] == 1) {
-
-                                    ev = new IntMsg(INTERESTED, node, lastInterested);
-                                    latency = ((Transport) node.getProtocol(tid)).getLatency
-                                            (node, cache[j].node);
-                                    EDSimulator.add(latency, ev, cache[j].node, pid);
-                                    cache[j].justSent();
-                                }
-
-                                if (!alive(cache[j].node)) {
-                                    //System.out.println("unchoke2 rm neigh
-                                    // "+ cache[j].node.getID() );
-                                    removeNeighbor(cache[j].node);
-                                    processNeighborListSize(node, pid);
-                                }
-                            }
-                            block = getBlock();
-                        } else { // block value referred to a real block
-                            if (alive(cache[senderIndex].node) &&
-                                    swarm[senderIndex][decode(block, 0)] == 1 && addRequest
-                                    (block)) { // The sender has
-                                // that block
-                                //                                ev = new
-                                // IntMsg(REQUEST, node, block,
-                                //
-                                // CommonState.getTime());
-//                                HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-//                                        .getSortedInteractions(DOWNLOAD);
-                                ev = new RequestMsg(node, block, CommonState.getTime(),
-                                        null, null);
+                        for (int i = 4; i >= 0 && t > 0; i--) {
+                            if (pendingRequest[i] == -1) break;
+                            if (alive(cache[senderIndex].node) && swarm[senderIndex][decode
+                                    (pendingRequest[i], 0)] == 1) { //If the sender has that
+                                // piece
+                                //                            HashMap<Long, Integer>
+                                // downloadInteractions = ((BitNode) node)
+                                //                                    .getSortedInteractions
+                                // (DOWNLOAD);
+                                // ev = new IntMsg(REQUEST, node, pendingRequest[i], CommonState
+                                // .getTime());
+                                ev = new RequestMsg(node, pendingRequest[i], CommonState.getTime
+                                        (), null, null);
                                 latency = ((Transport) node.getProtocol(tid)).getLatency(node,
                                         sender);
                                 EDSimulator.add(latency, ev, sender, pid);
 
                                 TimeOutEvent toe = new TimeOutEvent(CommonState.getTime(),
-                                        block, sender);
+                                        pendingRequest[i], sender);
                                 int timeout = 10000;
                                 EDSimulator.add(timeout, toe, node, pid);
 
-                                RequestMsg requestMsg = (RequestMsg)ev;
+                                RequestMsg requestMsg = (RequestMsg) ev;
+
                                 try {
-                                    ((BitNode) node).file_requests.write(requestMsg.getTime()+";"+node
-                                            .getID()+";"+requestMsg.getInt()+";"+
-                                            (CommonState.getTime()+latency)+";"+sender.getID()+"\n");
+                                    ((BitNode) node).file_requests.write(requestMsg.getTime() +
+                                            ";" + node.getID() + ";" + requestMsg.getInt() + ";" +
+                                            (CommonState.getTime() + latency) + ";" + sender
+                                            .getID() + "\n");
                                 } catch (IOException exception) {
                                     exception.printStackTrace();
                                 }
 
                                 if (!((BitNode) node).addInteraction(CommonState.getTime(),
-                                        sender.getID(), SENT, DOWNLOAD, block))
+                                        sender.getID(), SENT, DOWNLOAD, pendingRequest[i]))
                                     System.err.println("Interaction not added");
                                 cache[senderIndex].justSent();
-                            } else {
-                                if (!alive(cache[senderIndex].node)) {
-                                    System.out.println("unchoke3 rm neigh " + cache[senderIndex]
-                                            .node.getID());
-                                    removeNeighbor(cache[senderIndex].node);
-                                    processNeighborListSize(node, pid);
-                                }
+                            }
+                            if (!alive(cache[senderIndex].node)) {
+                                System.out.println("unchoke1 rm neigh " + cache[i].node.getID());
+                                removeNeighbor(cache[senderIndex].node);
+                                processNeighborListSize(node, pid);
                                 return;
                             }
-                            block = getBlock();
+                            t--;
+                        }
+                        // I request missing blocks to fill the queue
+                        int block = getBlock();
+                        int piece;
+                        while (block != -2) { //while still available request to
+                            // send
+                            if (block < 0) { // No more block to request for the
+                                // current piece
+                                piece = getPiece();
+                                if (piece == -1) { // no more piece to request
+                                    break;
+                                }
+                                for (int j = 0; j < swarmSize; j++) {// send the
+                                    // interested message to those
+                                    // nodes which have that piece
+                                    lastInterested = piece;
+                                    if (alive(cache[j].node) && swarm[j][piece] == 1) {
+
+                                        ev = new IntMsg(INTERESTED, node, lastInterested);
+                                        latency = ((Transport) node.getProtocol(tid)).getLatency
+                                                (node, cache[j].node);
+                                        EDSimulator.add(latency, ev, cache[j].node, pid);
+                                        cache[j].justSent();
+                                    }
+
+                                    if (!alive(cache[j].node)) {
+                                        //System.out.println("unchoke2 rm neigh
+                                        // "+ cache[j].node.getID() );
+                                        removeNeighbor(cache[j].node);
+                                        processNeighborListSize(node, pid);
+                                    }
+                                }
+                                block = getBlock();
+                            } else { // block value referred to a real block
+                                if (alive(cache[senderIndex].node) &&
+                                        swarm[senderIndex][decode(block, 0)] == 1 && addRequest
+                                        (block) && nPiecesDown < 10 /* Just to avoid the nodes
+                                        downloading many pieces at same time */) { // The
+                                    // sender has that block
+
+                                    // ev = new
+                                    // IntMsg(REQUEST, node, block,
+                                    //
+                                    // CommonState.getTime());
+                                    //                                HashMap<Long, Integer>
+                                    // downloadInteractions = ((BitNode) node)
+                                    //
+                                    // .getSortedInteractions(DOWNLOAD);
+                                    ev = new RequestMsg(node, block, CommonState.getTime(), null,
+                                            null);
+                                    latency = ((Transport) node.getProtocol(tid)).getLatency
+                                            (node, sender);
+                                    EDSimulator.add(latency, ev, sender, pid);
+
+                                    TimeOutEvent toe = new TimeOutEvent(CommonState.getTime(),
+                                            block, sender);
+                                    int timeout = 10000;
+                                    EDSimulator.add(timeout, toe, node, pid);
+
+                                    RequestMsg requestMsg = (RequestMsg) ev;
+                                    try {
+                                        ((BitNode) node).file_requests.write(requestMsg.getTime()
+                                                + ";" + node.getID() + ";" + requestMsg.getInt()
+                                                + ";" +
+                                                (CommonState.getTime() + latency) + ";" + sender
+                                                .getID() + "\n");
+                                    } catch (IOException exception) {
+                                        exception.printStackTrace();
+                                    }
+
+                                    if (!((BitNode) node).addInteraction(CommonState.getTime(),
+                                            sender.getID(), SENT, DOWNLOAD, block))
+                                        System.err.println("Interaction not added");
+                                    cache[senderIndex].justSent();
+                                } else {
+                                    if (!alive(cache[senderIndex].node)) {
+                                        System.out.println("unchoke3 rm neigh " +
+                                                cache[senderIndex].node.getID());
+                                        removeNeighbor(cache[senderIndex].node);
+                                        processNeighborListSize(node, pid);
+                                    }
+                                    return;
+                                }
+                                block = getBlock();
+                            }
                         }
                     }
                     unchokedBy[senderIndex] = true; // I add the sender to
@@ -994,6 +1008,7 @@ public class BitTorrent implements EDProtocol {
                         int slowFactor = 100; //Minimum of 1
                         localRate = (maxBandwidth / (nPiecesUp + nPiecesDown)) *(slowFactor/100);
                         bandwidth = Math.min(remoteRate, localRate);
+                        bandwidth = bandwidth == 0 ? 1 : bandwidth;
                         //TODO downloadTime is 0
                         downloadTime = (((16 * 8) / (bandwidth)) * 1000); // in
                         // milliseconds
@@ -1176,8 +1191,9 @@ public class BitTorrent implements EDProtocol {
                                 + CommonState.getTime());
                         this.peerStatus = 1;
 
-                        try ( FileWriter fileWriter = new FileWriter("csv/s" + CommonState.r
-                                        .getLastSeed() + ".csv", true)) {
+                        try ( FileWriter fileWriter = new FileWriter("csv/s" + Network.size() +
+                                getUnchokingAlgorithm() + "_" + NetworkInitializer.nFreeRider +
+                                ".csv", true)) {
                             fileWriter.write(node.getID() + ";" + ((BitNode) node).getBehaviour()
                                     + ";" + CommonState.getTime() + "\n");
                         } catch (IOException e1) {
@@ -1544,7 +1560,7 @@ public class BitTorrent implements EDProtocol {
                             .getID
                             ()) {
                         Element e = search(sender.getID());
-                        if (e != null) { //if I know the sender
+                        if (e != null && unchokedBy[e.peer]) { //if I know the sender
                             cache[e.peer].isAlive();
 
                             ev = new IntMsg(INTERESTED, node, lastInterested);
@@ -1553,13 +1569,17 @@ public class BitTorrent implements EDProtocol {
                             EDSimulator.add(latency, ev, neighbor.node, pid);
                             neighbor.justSent();
 
-                        } else {
-                            System.err.println("despite it should never happen, it " + "happened");
-//                            ev = new BitfieldMsg(BITFIELD, true, false, node, status, nPieces);
-//                            latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
-//                            EDSimulator.add(latency, ev, sender, pid);
-//                            nBitfieldSent++;
+                            //TODO
+                            if (--t == 0) break;
                         }
+                            // else {
+//                            System.err.println("despite it should never happen, it happened " +
+//                                    TIMEOUT);
+////                            ev = new BitfieldMsg(BITFIELD, true, false, node, status, nPieces);
+////                            latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
+////                            EDSimulator.add(latency, ev, sender, pid);
+////                            nBitfieldSent++;
+//                        }
                     }
                 }
 

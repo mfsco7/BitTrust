@@ -26,7 +26,7 @@ public class BitNode extends GeneralNode {
     private static final int CHOKE = 2;
     private static final int UNCHOKE = 3;
 
-    private static final int maxToUnchoke = 4;
+    private static final int maxToUnchoke = 3;
 
     private static final String PAR_PROT = "protocol";
     private static final String PAR_MAX_INTER = "max_interactions";

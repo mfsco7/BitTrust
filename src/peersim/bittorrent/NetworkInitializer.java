@@ -70,7 +70,8 @@ public class NetworkInitializer implements Control {
 
 	private final int nBadChunk;
 	private final int nSlow;
-	private final int nFreeRider;
+	//TODO nFreeRider should be final
+	static int nFreeRider;
 
 	private Random rnd;
 
