@@ -225,7 +225,7 @@ def run_process(cfg_file="conf/Time-1.conf", seed=1234567890):
                 down_times[node_type] = [int(time)]
             nodes_completed[int(node)] = [True]
     #
-    for n in range(2, 30):
+    for n in range(2, nnodesToRun[0]):
         if n not in nodes_completed:
             string = "Node " + str(n) + " is "
             temp0 = stdout.split(string)
