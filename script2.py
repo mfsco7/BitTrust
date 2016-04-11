@@ -1,17 +1,17 @@
 from datetime import datetime
 from math import floor, ceil
-from matplotlib.pyplot import plot, savefig
-from numpy import arange
 from os import mkdir
 from os.path import exists
-from psutil import Popen
 from shutil import copyfile
 from statistics import stdev, mean
 from subprocess import PIPE
+from threading import Lock, Thread, current_thread
+
+from matplotlib.pyplot import plot, savefig
+from numpy import arange
+from psutil import Popen, cpu_count
 
 import csv
-
-from threading import Lock, Thread
 
 peersimLibraries = "../peersim-1.0.5/*"
 commonsmath35Library = "../commons-math3-3.5/commons-math3-3.5.jar"
@@ -33,9 +33,9 @@ cfgfiles = ["Time30t1f.conf", "Time30t3f.conf", "Time30t5f.conf", "Time30t10f.co
             "Time30T3f.conf", "Time30T5f.conf", "Time30T10f.conf", "Time30T15f.conf",
             "Time30T20f.conf", "Time30T25f.conf"]
 
-nnodesToRun = [20]
+nnodesToRun = [30]
 # percemfreeRidersToRUn = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
-percemfreeRidersToRUn = [0, 1, 2]
+percemfreeRidersToRUn = [0, 1, 2, 3, 5, 10, 15, 20, 25]
 algorithmsToRun = ["original", "trust", "trust2"]
 
 
@@ -90,6 +90,50 @@ def simulate(lock):
         lock.release()
 
 
+def simulate3(lock, tasklist):
+    global simulation
+
+    ntasks = len(tasklist)
+
+    while True:
+        try:
+            lock.acquire(timeout=3)
+            sim = simulation
+            simulation += 1
+            lock.release()
+
+            if sim >= ntasks:
+                # print(threading.current_thread().name + " finishes")
+                break
+            else:
+
+                [num_nodes, algorithm2, nfreerider2] = tasklist[sim]
+                print("simulation " + str(sim) + " starting in " + current_thread().name +
+                      " " + str(num_nodes) + " nodes " + str(algorithm2) + " " + str(nfreerider2)
+                      + " free riders")
+                cfg_file2 = generate_conf_file2(12345678901, num_nodes, algorithm2, nfreerider2)
+                # print(threading.current_thread().name + " " + cfg_file2)
+
+                last_time = run_process(cfg_file2, task=[num_nodes, algorithm2, nfreerider2])
+
+                lock.acquire(timeout=3)
+                tmp = [cfg_file2] + [str(time) for time in last_time.values()]
+                print(tmp)
+
+                with open('csv/simulationTimes20160411.csv', 'a+', newline='') as csv_file2:
+                    writer2 = csv.writer(csv_file2, delimiter=';')
+                    writer2.writerow(tmp)
+                #
+                # writer2.writerow([cfg_file2] + [time for time in last_time.values()])
+                print("simulation " + str(sim) + " finishes")
+                lock.release()
+
+        except TimeoutError:
+            lock.release()
+
+    return
+
+
 def simulate2(lock, num_nodes, nfreerider2, algorithm2):
     global simulation
 
@@ -99,19 +143,26 @@ def simulate2(lock, num_nodes, nfreerider2, algorithm2):
         print("simulation " + str(sim) + " starting")
 
         # rand_seed = randint(1, 2 ** 63 - 1)
-        # cfg_file2 = generate_conf_file(rand_seed, sim)
         cfg_file2 = generate_conf_file2(1234567890, algorithm2, num_nodes, nfreerider2)
-        simulation += 1
-        lock.release()
+        simulation += simulation
 
-        # last_time = 0
-        print(cfg_file2)
-        last_time = run_process(cfg_file2)
+        # try:
+        #     lock.acquire(timeout=3)
+        #     sim = simulation
+        #     print("simulation " + str(sim) + " starting")
+        #
+        #     rand_seed = randint(1, 2 ** 63 - 1)
+        #     cfg_file2 = generate_conf_file(rand_seed, sim)
+        #     cfg_file2 = generate_conf_file2(1234567890, algorithm2, num_nodes, nfreerider2)
+        #     simulation += 1
+        #     lock.release()
+        #
+        #     last_time = run_process(cfg_file2)
         # last_time = {'FREE_RIDER':  7 ** 7, 'NORMAL': 7 ** 7}
 
-        lock.acquire(timeout=3)
+        # lock.acquire(timeout=3)
 
-        """ see and change confidence here """
+        # """ see and change confidence here """
         # for key in last_time.keys():
         #    downtime[key] += [last_time[key]]
         #    if len(downtime[key]) > 1:
@@ -121,16 +172,46 @@ def simulate2(lock, num_nodes, nfreerider2, algorithm2):
 
         #
         # writer.writerow([time for time in last_time.values()])
-        tmp = [cfg_file2] + [str(time) for time in last_time.values()]
-        print(tmp)
+        # tmp = [cfg_file2] + [str(time) for time in last_time.values()]
+        # print(tmp)
 
-        with open('csv/simulationTimes20160407.csv', 'a+', newline='') as csv_file2:
-            writer2 = csv.writer(csv_file2, delimiter=';')
-            writer2.writerow(tmp)
+        # with open('csv/simulationTimes20160411.csv', 'a+', newline='') as csv_file2:
+        #     writer2 = csv.writer(csv_file2, delimiter=';')
+        #     writer2.writerow(tmp)
         #
         # writer2.writerow([cfg_file2] + [time for time in last_time.values()])
-        print("simulation " + str(sim) + " finishes")
-        lock.release()
+        # print("simulation " + str(sim) + " finishes")
+        # lock.release()
+        #
+        # lock.release()
+
+        # last_time = 0
+        # print(cfg_file2)
+        # last_time = run_process(cfg_file2)
+        # last_time = {'FREE_RIDER':  7 ** 7, 'NORMAL': 7 ** 7}
+
+        # lock.acquire(timeout=3)
+
+        # """ see and change confidence here """
+        # for key in last_time.keys():
+        #    downtime[key] += [last_time[key]]
+        #    if len(downtime[key]) > 1:
+        #        interval_spread[key] = calc_interval(downtime[key])
+        #        if interval_spread[key] < mis:
+        #            interval_small = True
+
+        #
+        # writer.writerow([time for time in last_time.values()])
+        # tmp = [cfg_file2] + [str(time) for time in last_time.values()]
+        # print(tmp)
+
+        # with open('csv/simulationTimes20160411.csv', 'a+', newline='') as csv_file2:
+        #     writer2 = csv.writer(csv_file2, delimiter=';')
+        #     writer2.writerow(tmp)
+        #
+        # writer2.writerow([cfg_file2] + [time for time in last_time.values()])
+    #         print("simulation " + str(sim) + " finishes")
+    #         lock.release()
     except TimeoutError:
         lock.release()
 
@@ -165,7 +246,7 @@ def generate_conf_file(rand_seed=1234567890, sim=0):
     return cfg_file2
 
 
-def generate_conf_file2(rand_seed=1234567890, algorithmm='original', net_size=100,
+def generate_conf_file2(rand_seed=1234567890, net_size=100, algorithmm='original',
                         freerider=0):
     """
     Make new configuration file based on template cfgFile. It will take a integer to
@@ -178,7 +259,7 @@ def generate_conf_file2(rand_seed=1234567890, algorithmm='original', net_size=10
     :param sim: Simulation Number
     :return: Names of Configuration files
     """
-    cfg_file2 = "conf/Time" + algorithmm + "_" + str(nfreerider) + "f.conf"
+    cfg_file2 = "conf/Time" + str(net_size) + algorithmm + "_" + str(freerider) + "f.conf"
     copyfile(cfgFile, cfg_file2)
     with open(cfg_file2, mode="a") as file:
         file.write("# This part was generated by the script\n")
@@ -190,15 +271,18 @@ def generate_conf_file2(rand_seed=1234567890, algorithmm='original', net_size=10
     return cfg_file2
 
 
-def run_process(cfg_file="conf/Time-1.conf", seed=1234567890):
+def run_process(cfg_file="conf/Time-1.conf", seed=1234567890, task=None):
     """
     Creates nodeID new process and waits for it to end. After process termination it will fetch the
     last node download time.
 
+    :param task:
     :param cfg_file: Name of configuration file
     :param seed:
     :return: Time that last node took to fetch the file
     """
+    if task is None:
+        task = [30, "original", 0]
     p = Popen(["java", "-cp", libraries, "peersim.Simulator", cfg_file], stdout=PIPE, stderr=PIPE,
               universal_newlines=True)
     # p = Popen(["ls", cfg_file], stdout=PIPE, stderr=PIPE)
@@ -208,8 +292,7 @@ def run_process(cfg_file="conf/Time-1.conf", seed=1234567890):
     # last_peer = stdout.split(" at time ")[-1]
     # last_time = int(last_peer.split('\n')[0])
     #
-    # return last_time
-    print(type(stdout))
+    # print(type(stdout))
     # p.wait()
     # stdout = stdout.decode("utf-8")
 
@@ -218,14 +301,15 @@ def run_process(cfg_file="conf/Time-1.conf", seed=1234567890):
     nodes_completed = {}
 
     algo = ""
-    if algorithm == "original":
+    if task[1] == "original":
         algo = "ORIGINAL"
-    elif algorithm == 'trust':
+    elif task[1] == 'trust':
         algo = "TRUST"
-    elif algorithm == "trust2":
+    elif task[1] == "trust2":
         algo = "TRUST2"
 
-    with open('csv/s' + str(100) + algo + '_' + str(nfreerider) + '.csv', newline='') as csv_file_p:
+    with open('csv/s' + str(task[0]) + algo + '_' + str(task[2]) + '.csv', newline='') as \
+            csv_file_p:
         spam_reader = csv.reader(csv_file_p, delimiter=';')
         for row in spam_reader:
             [node, node_type, time] = row
@@ -235,7 +319,7 @@ def run_process(cfg_file="conf/Time-1.conf", seed=1234567890):
                 down_times[node_type] = [int(time)]
             nodes_completed[int(node)] = [True]
     #
-    for n in range(2, 100):
+    for n in range(2, task[0], 1):
         if n not in nodes_completed:
             string = "Node " + str(n) + " is "
             temp0 = stdout.split(string)
@@ -313,17 +397,15 @@ def plot_graph(x: list, y: list):
 
 
 if __name__ == '__main__':
-       # nProcessors = cpu_count()
-    nProcessors = 2
+    nProcessors = min(cpu_count(), len(nnodesToRun) * len(algorithmsToRun) * len(
+        percemfreeRidersToRUn))
+    # nProcessors = 16
 
     locker = Lock()
-    # algorithms = ["original"]
 
     if not exists("csv"):
         mkdir("csv", 0o744)
 
-        # for cfgfile in cfgfiles:
-        # for j in range(1):
     t = []
     simulation = 0
     downtime = {'FREE_RIDER': [], 'NORMAL': []}
@@ -332,38 +414,28 @@ if __name__ == '__main__':
     if not exists(folder_name):
         mkdir(folder_name, 0o744)
 
-    # print("Simulations with " + algorithm + " started")
-
-    # with open('csv/simulationTimes20160.csv', 'w+', newline='\n') as csv_file0:
-    #     csv_file0.write("bla\n")
-
     """ Creates new csv file or overwrites the old """
-    # with open('csv/simulationTimes20160407.csv', 'w') as csv_file:
+    # with open('csv/simulationTimes20160411.csv', 'w') as csv_file:
     #     writer = csv.writer(csv_file, delimiter=';')
     #     writer.writerow(['Random Seed', 'NormalTime', 'FreeRiderTime', 'NormalSpread',
     #                      'FreeRiderSpread'])
 
+    tasks = []
+
     for nnodes in nnodesToRun:
-        t = []
         for algorithm in algorithmsToRun:
             for nfreerider in percemfreeRidersToRUn:
+                tasks += [[nnodes, algorithm, nfreerider]]
 
-                """ Create threads to control simulation """
+    for i in range(nProcessors):
+        t.append(Thread(target=simulate3, args=(locker, tasks)))
+        t[i].start()
 
-                thread = Thread(target=simulate2, args=(locker, nnodes, nfreerider, algorithm))
-                t.append(thread)
-                # thread.start()
-                # simulate2(nnodes, nfreerider, algorithm)
+    """ Waits for threads to finish """
+    for i in range(nProcessors):
+        t[i].join()
 
-        for s in range(len(t)-nProcessors):
-            for n in range(nProcessors):
-                print()
+    # avg_downtime, avg_downtime2 = calc_avg()
+    # plot_graph(avg_downtime, avg_downtime2)
 
-        """ Waits for threads to finish """
-        for i in range(3*len(percemfreeRidersToRUn)):
-            t[i].join()
-
-# avg_downtime, avg_downtime2 = calc_avg()
-# plot_graph(avg_downtime, avg_downtime2)
-
-print("done")
+    print("done")
