@@ -29,6 +29,8 @@ import peersim.util.IncrementalFreq;
 import peersim.util.IncrementalStats;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
 
 /**
  * This {@link Control} provides a way to keep track of some
@@ -132,6 +134,26 @@ public class BTObserver implements Control {
                         (i).getProtocol(pid))).nPiecesUp + " time: " +
                         CommonState.getTime());
 
+
+                HashMap<Long, Integer> npd2 = ((BitTorrent) Network.get(i).getProtocol(pid))
+                .nPiecesDown2;
+                Collection<Integer> values =npd2.values();
+
+                long tmp = values.stream().mapToInt(Integer::intValue).sum();
+
+                HashMap<Long, Integer> npu2 = ((BitTorrent) Network.get(i).getProtocol(pid))
+                        .nPiecesUp2;
+                Collection<Integer> valuesU =npu2.values();
+
+                long tmpU = valuesU.stream().mapToInt(Integer::intValue).sum();
+
+
+                System.out.println("OBS: node " + ((BitTorrent) (Network.get
+                        (i).getProtocol(pid))).getThisNodeID() + "(" +
+                        peerStatus + ")" + "\t pieces completed: " +
+                        numberOfCompletedPieces + "\t \t down: " +
+                        tmp + "\t up: " + tmpU + " time: " +
+                        CommonState.getTime());
 
                 BitNode node = ((BitNode) (Network.get(i)));
 

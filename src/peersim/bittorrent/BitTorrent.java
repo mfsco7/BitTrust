@@ -32,6 +32,7 @@ import peersim.transport.Transport;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 
 import static utils.Interaction.RESULT.SENT;
 import static utils.Interaction.TYPE.DOWNLOAD;
@@ -228,6 +229,8 @@ public class BitTorrent implements EDProtocol {
      * Current number of pieces in download to the local peer.
      */
     public int nPiecesDown = 0;
+    public HashMap<Long, Integer> nPiecesUp2 = new HashMap<>();
+    public HashMap<Long, Integer> nPiecesDown2 = new HashMap<>();
     /**
      * The maxium connection speed of the local node.
      */
@@ -963,6 +966,7 @@ public class BitTorrent implements EDProtocol {
                 Element e;
                 BitTorrent senderP;
                 int remoteRate;
+                int remoteRate2;
                 int localRate;
                 int bandwidth;
                 int downloadTime;
@@ -999,10 +1003,18 @@ public class BitTorrent implements EDProtocol {
                     if (e != null && alive(req.sender)) {
                         ev = new IntMsg(PIECE, node, req.id, req.time);
                         nPiecesUp++;
+                        Integer up = nPiecesUp2.get(e.ID);
+                        nPiecesUp2.put(e.ID, up != null ? ++up : 1);
                         e.valueUP++;
+                        Integer up2 = e.valueUP2.get(e.ID);
+                        e.valueUP2.put(e.ID, up2 != null ? ++up2 : 1);
                         senderP = ((BitTorrent) req.sender.getProtocol(pid));
                         senderP.nPiecesDown++;
+                        Integer down = senderP.nPiecesDown2.get(thisNodeID);
+                        senderP.nPiecesDown2.put(thisNodeID,  down != null ? ++down : 1);
                         remoteRate = senderP.maxBandwidth / (senderP.nPiecesUp + senderP
+                                .nPiecesDown);
+                        remoteRate2 = senderP.maxBandwidth / (senderP.nPiecesUp + senderP
                                 .nPiecesDown);
                         //TODO slowFactor only for slow on purpose nodes
                         int slowFactor = 100; //Minimum of 1
@@ -1038,8 +1050,8 @@ public class BitTorrent implements EDProtocol {
                 /*	Set the correct value for the local uploading and remote
                 downloading number of pieces */
                 nPiecesDown--;
-
-
+                Integer down = nPiecesDown2.get(sender.getID());
+                nPiecesDown2.put(sender.getID(), --down);
 
                 if (peerStatus == 1)// To save CPU cycles
                     return;
@@ -1051,6 +1063,8 @@ public class BitTorrent implements EDProtocol {
                     return;
                 }
                 e.valueDOWN++;
+                Integer down2 = e.valueDown2.get(thisNodeID);
+                e.valueDown2.put(thisNodeID, down2 != null ? ++down2 : 1);
 
                 cache[e.peer].isAlive();
 
@@ -1480,6 +1494,9 @@ public class BitTorrent implements EDProtocol {
                         cache[byPeer[i].peer].status = 2; // I'm snubbed by it
                     }
                     byPeer[i].head60 = byPeer[i].valueDOWN;
+                    for (Map.Entry<Long, Integer> entry : byPeer[i].valueDown2.entrySet()) {
+                        byPeer[i].head60_2.put(entry.getKey(), entry.getValue());
+                    }
                 }
                 ev = new SimpleEvent(ANTISNUB_TIME);
                 EDSimulator.add(60000, ev, node, pid);
@@ -1540,6 +1557,9 @@ public class BitTorrent implements EDProtocol {
 
             case DOWNLOAD_COMPLETED: {
                 nPiecesUp--;
+                long id = ((SimpleMsg) event).getSender().getID();
+                Integer up = nPiecesUp2.get(id);
+                nPiecesUp2.put(id, up != null ? --up : 1);
             }
             ;
             break;
@@ -2100,6 +2120,8 @@ public class BitTorrent implements EDProtocol {
         ((BitTorrent) prot).swarm = new int[swarmSize][nPieces];
         ((BitTorrent) prot).requestToServe = new Queue(20);
         ((BitTorrent) prot).incomingPieces = new Queue(100);
+        ((BitTorrent) prot).nPiecesDown2 = new HashMap<>();
+        ((BitTorrent) prot).nPiecesUp2 = new HashMap<>();
         return prot;
     }
 
@@ -2272,6 +2294,8 @@ class Element {
      * Number of blocks downloaded from anyone since the beginning.
      */
     public int valueDOWN = 0;
+    public HashMap<Long, Integer> valueUP2 = new HashMap<>();
+    public HashMap<Long, Integer> valueDown2 = new HashMap<>();
     /**
      * Value of either {@link #valueUP} or {@link #valueDOWN} (depending by
      * {@link peersim.bittorrent.BitTorrent#peerStatus}) 20 seconds before.
@@ -2282,6 +2306,8 @@ class Element {
      * {@link peersim.bittorrent.BitTorrent#peerStatus}) 60 seconds before.
      */
     public int head60 = 0;
+    public HashMap<Long, Integer> head20_2 = new HashMap<>();
+    public HashMap<Long, Integer> head60_2 = new HashMap<>();
     /**
      * <tt>true</tt> if the node is a seeder, <tt>false</tt> otherwise.
      */
@@ -2300,6 +2326,35 @@ class Element {
         destination.valueDOWN = this.valueDOWN;
         destination.head20 = this.head20;
         destination.head60 = this.head60;
+
+        //TODO better way to copy rates
+        destination.valueUP2 = new HashMap<>();
+        for (Map.Entry<Long, Integer> entry : valueUP2.entrySet()) {
+            if (entry != null) {
+
+            destination.valueUP2.put(entry.getKey(), entry.getValue());
+            }
+        }
+        destination.valueDown2 = new HashMap<>();
+        for (Map.Entry<Long, Integer> entry : valueDown2.entrySet()) {
+            if (entry != null) {
+
+            destination.valueDown2.put(entry.getKey(), entry.getValue());
+            }
+        }
+
+        destination.head20_2 = new HashMap<>();
+        for (Map.Entry<Long, Integer> entry : head20_2.entrySet()) {
+            if (entry != null) {
+
+            destination.head20_2.put(entry.getKey(), entry.getValue());
+            }
+        }
+        destination.head60_2 = new HashMap<>();
+        for (Map.Entry<Long, Integer> entry : head60_2.entrySet()) {
+
+            destination.head60_2.put(entry.getKey(), entry.getValue());
+        }
     }
 }
 
