@@ -2301,11 +2301,11 @@ class Element {
      */
     public int valueDOWN = 0;
     /**
-     * Number of blocks uploaded to anyone since the beginning.
+     * Number of blocks uploaded to each node since the beginning.
      */
     public HashMap<Long, Integer> valueUP2 = new HashMap<>();
     /**
-     * Number of blocks downloaded from anyone since the beginning.
+     * Number of blocks downloaded from each node since the beginning.
      */
     public HashMap<Long, Integer> valueDown2 = new HashMap<>();
     /**
@@ -2347,34 +2347,11 @@ class Element {
         destination.head20 = this.head20;
         destination.head60 = this.head60;
 
-        //TODO better way to copy rates
-        destination.valueUP2 = new HashMap<>();
-        for (Map.Entry<Long, Integer> entry : valueUP2.entrySet()) {
-            if (entry != null) {
+        destination.valueUP2 = new HashMap<>(valueUP2);
+        destination.valueDown2 = new HashMap<>(valueDown2);
 
-                destination.valueUP2.put(entry.getKey(), entry.getValue());
-            }
-        }
-        destination.valueDown2 = new HashMap<>();
-        for (Map.Entry<Long, Integer> entry : valueDown2.entrySet()) {
-            if (entry != null) {
-
-                destination.valueDown2.put(entry.getKey(), entry.getValue());
-            }
-        }
-
-        destination.head20_2 = new HashMap<>();
-        for (Map.Entry<Long, Integer> entry : head20_2.entrySet()) {
-            if (entry != null) {
-
-                destination.head20_2.put(entry.getKey(), entry.getValue());
-            }
-        }
-        destination.head60_2 = new HashMap<>();
-        for (Map.Entry<Long, Integer> entry : head60_2.entrySet()) {
-
-            destination.head60_2.put(entry.getKey(), entry.getValue());
-        }
+        destination.head20_2 = new HashMap<>(head20_2);
+        destination.head60_2 = new HashMap<>(head60_2);
     }
 }
 
