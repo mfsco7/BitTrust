@@ -229,7 +229,13 @@ public class BitTorrent implements EDProtocol {
      * Current number of pieces in download to the local peer.
      */
     public int nPiecesDown = 0;
+    /**
+     * Current number of pieces in upload from the local peer.
+     */
     public HashMap<Long, Integer> nPiecesUp2 = new HashMap<>();
+    /**
+     * Current number of pieces in download to the local peer.
+     */
     public HashMap<Long, Integer> nPiecesDown2 = new HashMap<>();
     /**
      * The maxium connection speed of the local node.
@@ -2294,7 +2300,13 @@ class Element {
      * Number of blocks downloaded from anyone since the beginning.
      */
     public int valueDOWN = 0;
+    /**
+     * Number of blocks uploaded to anyone since the beginning.
+     */
     public HashMap<Long, Integer> valueUP2 = new HashMap<>();
+    /**
+     * Number of blocks downloaded from anyone since the beginning.
+     */
     public HashMap<Long, Integer> valueDown2 = new HashMap<>();
     /**
      * Value of either {@link #valueUP} or {@link #valueDOWN} (depending by
@@ -2306,7 +2318,15 @@ class Element {
      * {@link peersim.bittorrent.BitTorrent#peerStatus}) 60 seconds before.
      */
     public int head60 = 0;
+    /**
+     * Value of either {@link #valueUP} or {@link #valueDOWN} (depending by
+     * {@link peersim.bittorrent.BitTorrent#peerStatus}) 20 seconds before.
+     */
     public HashMap<Long, Integer> head20_2 = new HashMap<>();
+    /**
+     * Value of either {@link #valueUP} or {@link #valueDOWN} (depending by
+     * {@link peersim.bittorrent.BitTorrent#peerStatus}) 60 seconds before.
+     */
     public HashMap<Long, Integer> head60_2 = new HashMap<>();
     /**
      * <tt>true</tt> if the node is a seeder, <tt>false</tt> otherwise.
@@ -2332,14 +2352,14 @@ class Element {
         for (Map.Entry<Long, Integer> entry : valueUP2.entrySet()) {
             if (entry != null) {
 
-            destination.valueUP2.put(entry.getKey(), entry.getValue());
+                destination.valueUP2.put(entry.getKey(), entry.getValue());
             }
         }
         destination.valueDown2 = new HashMap<>();
         for (Map.Entry<Long, Integer> entry : valueDown2.entrySet()) {
             if (entry != null) {
 
-            destination.valueDown2.put(entry.getKey(), entry.getValue());
+                destination.valueDown2.put(entry.getKey(), entry.getValue());
             }
         }
 
@@ -2347,7 +2367,7 @@ class Element {
         for (Map.Entry<Long, Integer> entry : head20_2.entrySet()) {
             if (entry != null) {
 
-            destination.head20_2.put(entry.getKey(), entry.getValue());
+                destination.head20_2.put(entry.getKey(), entry.getValue());
             }
         }
         destination.head60_2 = new HashMap<>();

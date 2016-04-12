@@ -30,7 +30,6 @@ import peersim.util.IncrementalStats;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashMap;
 
 /**
  * This {@link Control} provides a way to keep track of some
@@ -71,33 +70,32 @@ public class BTObserver implements Control {
         IncrementalStats neighborStats = new IncrementalStats();
 
         int numberOfNodes = Network.size();
-        int numberOfCompletedPieces = 0;
+        int numberOfCompletedPieces;
 
         // cycles from 1, since the node 0 is the tracker
         for (int i = 1; i < numberOfNodes; ++i) {
 
+            BitTorrent nodeProtocol =((BitTorrent) (Network.get(i).getProtocol(pid)));
+
             // stats on number of leechers and seeders in the network
             // and consequently also on number of completed files in the network
-            nodeStatusStats.add(((BitTorrent) (Network.get(i).getProtocol
-                    (pid))).getPeerStatus());
+            nodeStatusStats.add(nodeProtocol.getPeerStatus());
 
             // stats on number of neighbors per peer
-            neighborStats.add(((BitTorrent) (Network.get(i).getProtocol(pid))
-            ).getNNodes());
+            neighborStats.add(nodeProtocol.getNNodes());
         }
 
-        // number of the pieces of the file, equal for every node, here 1 is
-        // chosen,
+        // number of the pieces of the file, equal for every node, here 1 is chosen,
         // since 1 is the first "normal" node (0 is the tracker)
-        int numberOfPieces = ((BitTorrent) (Network.get(1).getProtocol(pid)))
-                .nPieces;
+        int numberOfPieces = ((BitTorrent) (Network.get(1).getProtocol(pid))).nPieces;
 
         for (int i = 1; i < numberOfNodes; ++i) {
             numberOfCompletedPieces = 0;
 
+            BitTorrent nodeProtocol = ((BitTorrent) (Network.get(i).getProtocol(pid)));
+
             // discovers the status of the current peer (leecher or seeder)
-            int ps = ((BitTorrent) (Network.get(i).getProtocol(pid)))
-                    .getPeerStatus();
+            int ps = nodeProtocol.getPeerStatus();
             String peerStatus;
             if (ps == 0) {
                 peerStatus = "L"; //leecher
@@ -110,69 +108,55 @@ public class BTObserver implements Control {
 
                 // counts the number of completed pieces for the i-th node
                 for (int j = 0; j < numberOfPieces; j++) {
-                    int fileStatus =((BitTorrent) (Network.get(i).getProtocol(pid)))
-                            .getFileStatus()[j];
+                    int fileStatus = nodeProtocol.getFileStatus()[j];
                     if (fileStatus == 16) {
                         numberOfCompletedPieces++;
                     }
                 }
 
 				/*
-                 * Put here the output lines of the Observer. An example is
-				 * provided with
-				 * basic information and stats.
-				 * CommonState.getTime() is used to print out time references
-				 * (useful for graph plotting).
+                 * Put here the output lines of the Observer. An example is provided with basic
+                 * information and stats. CommonState.getTime() is used to print out time
+                 * references (useful for graph plotting).
 				 */
 
-                System.out.println("OBS: node " + ((BitTorrent) (Network.get
-                        (i).getProtocol(pid))).getThisNodeID() + "(" +
-                        peerStatus + ")" + "\t pieces completed: " +
-                        numberOfCompletedPieces + "\t \t down: " + (
-                        (BitTorrent) (Network.get(i).getProtocol(pid)))
-                        .nPiecesDown + "\t up: " + ((BitTorrent) (Network.get
-                        (i).getProtocol(pid))).nPiecesUp + " time: " +
-                        CommonState.getTime());
+                Collection<Integer> valuesDown = nodeProtocol.nPiecesDown2.values();
+                long nPiecesDown = valuesDown.stream().mapToInt(Integer::intValue).sum();
 
+                Collection<Integer> valuesUp = nodeProtocol.nPiecesUp2.values();
+                long nPiecesUp = valuesUp.stream().mapToInt(Integer::intValue).sum();
 
-                HashMap<Long, Integer> npd2 = ((BitTorrent) Network.get(i).getProtocol(pid))
-                .nPiecesDown2;
-                Collection<Integer> values =npd2.values();
-
-                long tmp = values.stream().mapToInt(Integer::intValue).sum();
-
-                HashMap<Long, Integer> npu2 = ((BitTorrent) Network.get(i).getProtocol(pid))
-                        .nPiecesUp2;
-                Collection<Integer> valuesU =npu2.values();
-
-                long tmpU = valuesU.stream().mapToInt(Integer::intValue).sum();
-
-
-                System.out.println("OBS: node " + ((BitTorrent) (Network.get
-                        (i).getProtocol(pid))).getThisNodeID() + "(" +
-                        peerStatus + ")" + "\t pieces completed: " +
-                        numberOfCompletedPieces + "\t \t down: " +
-                        tmp + "\t up: " + tmpU + " time: " +
-                        CommonState.getTime());
+                if (nodeProtocol.nPiecesDown != nPiecesDown || nodeProtocol.nPiecesUp != nPiecesUp) {
+                    System.out.println("OBS: node " + nodeProtocol.getThisNodeID() + "(" +
+                            peerStatus + ")\t pieces completed: " + numberOfCompletedPieces + "\t" +
+                            " \t down: " + nodeProtocol.nPiecesDown + "\t up: " +
+                            nodeProtocol.nPiecesUp + " time: " + CommonState.getTime());
+                    System.out.println("OBS: node " + nodeProtocol.getThisNodeID() + "(" +
+                            peerStatus + ")\t pieces completed: " + numberOfCompletedPieces + "\t" +
+                            " \t down: " + nPiecesDown + "\t up: " + nPiecesUp + " time: " +
+                            CommonState.getTime());
+                }
 
                 BitNode node = ((BitNode) (Network.get(i)));
 
-//                    node.printResumedInteractions(DOWNLOAD);
-//                System.out.println("----------------------------");
-//                    node.printResumedInteractions(UPLOAD);
-////                }
+                //                    node.printResumedInteractions(DOWNLOAD);
+                //                System.out.println("----------------------------");
+                //                    node.printResumedInteractions(UPLOAD);
+                ////                }
 
-//                System.out.println("Reputations");
+                //                System.out.println("Reputations");
 
-//                for (Neighbor neighbor : ((BitTorrent) (Network.get(i).getProtocol(pid)))
-//                        .getCache()) {
-//                    if (neighbor != null && neighbor.node != null && ((BitTorrent) (Network.get
-//                            (i).getProtocol(pid))).alive(neighbor.node)) {
-////
-//                        node.getPercentages(neighbor.node.getID());
-//
-//                    }
-//                }
+                //                for (Neighbor neighbor : ((BitTorrent) (Network.get(i)
+                // .getProtocol(pid)))
+                //                        .getCache()) {
+                //                    if (neighbor != null && neighbor.node != null && (
+                // (BitTorrent) (Network.get
+                //                            (i).getProtocol(pid))).alive(neighbor.node)) {
+                ////
+                //                        node.getPercentages(neighbor.node.getID());
+                //
+                //                    }
+                //                }
 
                 try {
                     node.file_requests.flush();
@@ -194,8 +178,7 @@ public class BTObserver implements Control {
         nodeStatusStats.printAll(System.out);
 
         // prints the average number of neighbors per peer
-        System.out.println("Avg number of neighbors per peer: " +
-                neighborStats.getAverage());
+        System.out.println("Avg number of neighbors per peer: " + neighborStats.getAverage());
 
         if (nodeStatusStats.getFreq(0) == 0) {
             System.exit(0);
