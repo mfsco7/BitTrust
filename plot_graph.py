@@ -1,7 +1,5 @@
-from datetime import datetime
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 node_type = "normal"
 # node_type = "freerider"
@@ -49,5 +47,3 @@ plt.show()
 
 # time = datetime.now().strftime('%Y%m%d_%H%M%S')
 # plt.savefig("sim_times_" + time + "_" + node_type + "_" + ".png")
-
-
