@@ -1,5 +1,6 @@
 from os import mkdir
 from os.path import exists
+from random import randint
 from shutil import copyfile
 from statistics import stdev, mean
 from subprocess import PIPE
@@ -18,6 +19,8 @@ libraries = peersimLibraries + ":" + commonsmath35Library + ":" + bitTrustOutDir
 cfgFile = "conf/Time.conf"
 
 simulation = 0
+
+'''Confidence Level'''
 confidence = 0.95
 zvalue = 1.96
 min_interval_range = 0.05
@@ -36,7 +39,26 @@ algorithms = ["original"]
 def simulate(lock, tasklist):
     global simulation
 
-    ntasks = len(tasklist)
+    sim_group = 0
+    n_groups = len(tasklist)
+
+    while sim_group < n_groups:
+        while simulation < 30 or not is_interval_small():
+            # TODO convert tasklist to a dict for better mapping
+
+
+            lock.acquire()
+            sim = simulation
+            print("simulation " + str(sim) + " starting in " + current_thread().name +
+                  " " + str(tasklist[sim_group]) + " nodes " + str(algorithm2) + " " + str(nfreerider2) +
+                  " free riders")
+
+            rand_seed = randint(1, 2 ** 63 - 1)
+            cfg_file2 = generate_conf_file(rand_seed, tasklist[sim_group], )
+            simulation += 1
+            lock.release()
+
+        sim_group += 1
 
     while True:
         try:
@@ -45,7 +67,7 @@ def simulate(lock, tasklist):
             simulation += 1
             lock.release()
 
-            if sim >= ntasks:
+            if sim >= n_groups:
                 # print(threading.current_thread().name + " finishes")
                 break
             else:
@@ -92,17 +114,22 @@ def is_interval_small():
 
 
 def generate_conf_file(rand_seed=1234567890, net_size=100, algorithmm='original',
-                       freerider=0):
+                       freerider=0, task: list = None):
     """
     Make new configuration file based on template cfgFile. It will take a integer to
     be a random seed parameter and produce a file for passing to peersim simulator.
 
-    :param freerider:
+    :param rand_seed: Integer to be used as random seed
     :param net_size:
     :param algorithmm:
-    :param rand_seed: Integer to be used as random seed
+    :param freerider:
+    :param task:
     :return: Names of Configuration files
     """
+    if task is not None:
+        net_size = task[0]
+        algorithmm = task[1]
+        freerider = task[2]
     cfg_file2 = "conf/Time" + str(net_size) + algorithmm + "_" + str(freerider) + "f.conf"
     copyfile(cfgFile, cfg_file2)
     with open(cfg_file2, mode="a") as file:
