@@ -6,6 +6,7 @@ from statistics import stdev, mean
 from subprocess import PIPE
 from threading import Lock, Thread, current_thread
 
+import pandas
 from psutil import Popen, cpu_count
 
 import csv
@@ -46,16 +47,23 @@ def simulate(lock, tasklist):
         while simulation < 30 or not is_interval_small():
             # TODO convert tasklist to a dict for better mapping
 
+            [net_size, algo, num_bad_nodes] = tasklist[sim_group]
 
             lock.acquire()
             sim = simulation
-            print("simulation " + str(sim) + " starting in " + current_thread().name +
-                  " " + str(tasklist[sim_group]) + " nodes " + str(algorithm2) + " " + str(nfreerider2) +
-                  " free riders")
+            rand_seed = randint(2 ** 30, 2 ** 34 - 1)
+            cfg_file2 = generate_conf_file(rand_seed, task=tasklist[sim_group])
 
-            rand_seed = randint(1, 2 ** 63 - 1)
-            cfg_file2 = generate_conf_file(rand_seed, tasklist[sim_group], )
             simulation += 1
+            print("sim %d starting in %s with %d nodes %s and %d" %
+                  (sim, current_thread().name, net_size, algo, num_bad_nodes))
+            lock.release()
+
+            run_process(cfg_file2, task=tasklist[sim_group])
+
+            lock.acquire()
+            parse_log_file()
+            check_conf_interval()
             lock.release()
 
         sim_group += 1
@@ -210,6 +218,36 @@ def run_process(cfg_file="conf/Time-1.conf", seed=1234567890, task: list = None)
     return down_times
 
 
+def parse_log_file(task: list, seed: int):
+    folder_name = "log/%d/%s/%d/%d/" % (task[0], task[1], task[2], seed)
+
+    file_name = folder_name + "NodeTypes.csv"
+    df = pandas.read_csv(file_name, sep=';')
+
+    file_name2 = folder_name + "DownTimes.csv"
+    df2 = pandas.read_csv(file_name2, sep=';')
+    avg = df2[['NodeType', 'DownTime']].groupby('NodeType').mean()['DownTime']
+
+    with open(file_name2, 'r', newline='') as csv_file2:
+        reader = csv.reader(csv_file_p, delimiter=';')
+        for row in reader:
+            [node, node_type, time] = row
+            if node_type in down_times:
+                down_times[node_type] += [int(time)]
+            else:
+                down_times[node_type] = [int(time)]
+            nodes_completed[int(node)] = [True]
+        writer2 = csv.writer(csv_file2, delimiter=';')
+        row = [cfg_file2, nfreerider2] + [str(time) for time in last_time.values()]
+        # print(row)
+        writer2.writerow(row)
+    return ""
+
+
+def check_conf_interval():
+    pass
+
+
 def calc_interval(down_time: list):
     """
     Computes the Interval Spread from the values contained on down_time. The interval spread is
@@ -238,9 +276,9 @@ if __name__ == '__main__':
     simulation = 0
     downtime = {'FREE_RIDER': [], 'NORMAL': []}
 
-    folder_name = "csv"
-    if not exists(folder_name):
-        mkdir(folder_name, 0o744)
+    log_folder_name = "csv"
+    if not exists(log_folder_name):
+        mkdir(log_folder_name, 0o744)
 
     """ Creates new csv file or overwrites the old """
     # with open('csv/simulationTimes20160411.csv', 'w') as csv_file:
@@ -265,3 +303,4 @@ if __name__ == '__main__':
         t[i].join()
 
     print("done")
+
