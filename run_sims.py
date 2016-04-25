@@ -218,15 +218,25 @@ def run_process(cfg_file="conf/Time-1.conf", seed=1234567890, task: list = None)
     return down_times
 
 
-def parse_log_file(task: list, seed: int):
+def parse_log_file(task: list, seed: int) -> dict:
+    """
+
+    :param task: net_size, algo, num freeriders
+    :param seed: random seed used on simulation
+    :return: Avg of download time
+    """
     folder_name = "log/%d/%s/%d/%d/" % (task[0], task[1], task[2], seed)
 
+    """ Obtain type of nodes """
     file_name = folder_name + "NodeTypes.csv"
     df = pandas.read_csv(file_name, sep=';')
 
+    """ Obtain download time, group by type and average it"""
     file_name2 = folder_name + "DownTimes.csv"
     df2 = pandas.read_csv(file_name2, sep=';')
-    avg = df2[['NodeType', 'DownTime']].groupby('NodeType').mean()['DownTime']
+
+    nodes_left = diff(df['NodeID'].values, df2['NodeID'].values)
+    avg = df3.groupby('NodeType').mean()['DownTime']
 
     with open(file_name2, 'r', newline='') as csv_file2:
         reader = csv.reader(csv_file_p, delimiter=';')
@@ -266,6 +276,28 @@ def calc_interval(down_time: list):
     return error / mean0
 
 
+def diff(a: list, b: list)-> list:
+    """
+    This is a temporary function and it will serve its purpose until a better implemented
+    function is found. Given two lists of any type, it will iterate through the biggest
+    and check if each element is on the other list. If its not, it's added to a third list. When
+    it finishes, returns the third list contain all elements belonging to the biggest list but
+    not to other.
+    :param a: First list (recommend to be biggest)
+    :param b: Second list (recommend to be smallest)
+    :return: List with elements belonging to biggest but not the smallest list
+    """
+    c = []
+    if len(a) < len(b):
+        temp = a
+        a = b
+        b = temp
+    for e in a:
+        if e not in b:
+            c += [e]
+    return c
+
+
 if __name__ == '__main__':
     locker = Lock()
 
@@ -303,4 +335,3 @@ if __name__ == '__main__':
         t[i].join()
 
     print("done")
-
