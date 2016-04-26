@@ -4,6 +4,7 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 import peersim.config.Configuration;
 import peersim.core.GeneralNode;
+import peersim.core.Network;
 import peersim.edsim.EDSimulator;
 import peersim.transport.Transport;
 import peersim.util.IncrementalFreq;
@@ -11,9 +12,15 @@ import utils.Interaction;
 import utils.Interaction.RESULT;
 import utils.Interaction.TYPE;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 import static utils.Interaction.RESULT.*;
 
@@ -42,12 +49,7 @@ public class BitNode extends GeneralNode {
     FileWriter reputationFile;
     private ArrayList<Interaction> interactions;
     private HashMap<Long, HashMap<Long, Double>> nodesDirectTrust;
-
-    enum Behaviour {
-        NORMAL, BAD_CHUNK, SLOW, FREE_RIDER}
-
     private Behaviour behaviour;
-
 
     //    /**
     //     * Used to construct the prototype node. This class currently does not
@@ -92,22 +94,6 @@ public class BitNode extends GeneralNode {
         behaviour = Behaviour.FREE_RIDER;
     }
 
-//    private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
-//        List list = new LinkedList<>(map.entrySet());
-//        // Defined Custom Comparator here
-//        Collections.sort(list, (o1, o2) -> ((Comparable) ((Map.Entry) (o1)).getValue()).compareTo(((Map.Entry) (o2))
-//                .getValue()));
-//
-//        // Here I am copying the sorted list in HashMap
-//        // using LinkedHashMap to preserve the insertion order
-//        HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
-//        for (Iterator it = list.iterator(); it.hasNext(); ) {
-//            Map.Entry entry = (Map.Entry) it.next();
-//            sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
-//        }
-//        return sortedHashMap;
-//    }
-
     public boolean addInteraction(long time, long nodeID, RESULT result, TYPE type, int blockID) {
         Interaction interaction = new Interaction(time, nodeID, result, type, blockID);
         removeOnLimit(nodeID, type);
@@ -120,6 +106,23 @@ public class BitNode extends GeneralNode {
         }
         return true;
     }
+
+    //    private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
+    //        List list = new LinkedList<>(map.entrySet());
+    //        // Defined Custom Comparator here
+    //        Collections.sort(list, (o1, o2) -> ((Comparable) ((Map.Entry) (o1)).getValue())
+    // .compareTo(((Map.Entry) (o2))
+    //                .getValue()));
+    //
+    //        // Here I am copying the sorted list in HashMap
+    //        // using LinkedHashMap to preserve the insertion order
+    //        HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
+    //        for (Iterator it = list.iterator(); it.hasNext(); ) {
+    //            Map.Entry entry = (Map.Entry) it.next();
+    //            sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
+    //        }
+    //        return sortedHashMap;
+    //    }
 
     public void removeOnLimit(long nodeID, TYPE type) {
 
@@ -184,19 +187,6 @@ public class BitNode extends GeneralNode {
         return count;
     }
 
-//    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
-//
-//        HashMap<Long, Integer> sortedInteractions = new HashMap<>();
-//
-//        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-//            if (neighbor != null && neighbor.node != null) {
-//                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions(neighbor.node
-//                        .getID(), type, GOOD));
-//            }
-//        }
-//        return sortByValues(sortedInteractions);
-//    }
-
     public void printResumedInteractions(TYPE type) {
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
             if (neighbor != null && neighbor.node != null /*&& (/*neighbor.node.getID() == 2 /*||
@@ -237,6 +227,20 @@ public class BitNode extends GeneralNode {
         }
     }
 
+    //    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
+    //
+    //        HashMap<Long, Integer> sortedInteractions = new HashMap<>();
+    //
+    //        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+    //            if (neighbor != null && neighbor.node != null) {
+    //                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions
+    // (neighbor.node
+    //                        .getID(), type, GOOD));
+    //            }
+    //        }
+    //        return sortByValues(sortedInteractions);
+    //    }
+
     @Override
     public Object clone() {
         BitNode result;
@@ -244,19 +248,31 @@ public class BitNode extends GeneralNode {
         result.interactions = new ArrayList<>();
         result.nodesDirectTrust = new HashMap<>();
         try {
-            result.file_interaction = new FileWriter("csv/interactions_" + result.getID() + ".csv");
+
+            Path folder_path = Paths.get("log", Integer.toString(Network.size()), ((BitTorrent)
+                    getProtocol(pid)).getUnchokingAlgorithm().toString(), Integer.toString
+                    (NetworkInitializer.nFreeRider));
+
+            result.file_interaction = new FileWriter(folder_path + File.separator +
+                    "interactions_" + result.getID() + ".csv");
+            //            result.file_interaction = new FileWriter("csv/interactions_" + result
+            // .getID() + ".csv");
             result.file_interaction.write("time;nodeID;result;type;blockID\n");
 
-            result.file_blocks = new FileWriter("csv/blocks_" + result.getID() + ".csv");
+            result.file_blocks = new FileWriter(folder_path + File.separator + "blocks_" +
+                    result.getID() + ".csv");
             result.file_blocks.write("receiveTime;nodeId;value;requestTime\n");
 
-            result.file_requests = new FileWriter("csv/requestsA_" + result.getID() + "" + ".csv");
+            result.file_requests = new FileWriter(folder_path + File.separator + "requestsA_" +
+                    result.getID() + "" + ".csv");
             result.file_requests.write("requestTime;sender;blockID;receiveTime;receiver\n");
 
-            result.messagesFile = new FileWriter("csv/messages_" + result.getID() + ".csv");
+            result.messagesFile = new FileWriter(folder_path + File.separator + "messages_" +
+                    result.getID() + ".csv");
             result.messagesFile.write("Time;Sender;Type\n");
 
-            result.reputationFile = new FileWriter("csv/reputation_" + result.getID() + ".csv");
+            result.reputationFile = new FileWriter(folder_path + File.separator + "reputation_" +
+                    result.getID() + ".csv");
             result.reputationFile.write("Node;DTP;RP;ITP;CRP;TTP;TRP\n");
         } catch (IOException e) {
             e.printStackTrace();
@@ -369,13 +385,14 @@ public class BitNode extends GeneralNode {
 
     /**
      * Compute the median absolute deviation of a array.
+     *
      * @param values array of double
      * @return the median absolute deviation of a array
      */
-    public double getMAD(double [] values, double medianValue){
-        double [] temp = new double[values.length];
+    public double getMAD(double[] values, double medianValue) {
+        double[] temp = new double[values.length];
         Median m = new Median();
-        for(int i=0 ; i<values.length ;i++){
+        for (int i = 0; i < values.length; i++) {
             temp[i] = Math.abs(values[i] - medianValue);
         }
         return m.evaluate(temp); //return the median of temp
@@ -474,7 +491,7 @@ public class BitNode extends GeneralNode {
 
             if (TTP >= quality[0] && TRP >= quality[1]) {
                 unchoke(neighbor);
-//                nodePercentages.remove(neighbor); //BitPeerList.Remove
+                //                nodePercentages.remove(neighbor); //BitPeerList.Remove
                 iterator.remove();
 
                 if (++nUnchoked >= maxToUnchoke) {
@@ -498,8 +515,7 @@ public class BitNode extends GeneralNode {
         neighbor.status = 0;
         Object ev = new SimpleMsg(CHOKE, this);
         int tid = ((BitTorrent) getProtocol(pid)).tid;
-        long latency = ((Transport) getProtocol(tid)).getLatency(this,
-                neighbor.node);
+        long latency = ((Transport) getProtocol(tid)).getLatency(this, neighbor.node);
         EDSimulator.add(latency, ev, neighbor.node, pid);
         neighbor.justSent();
     }
@@ -516,23 +532,27 @@ public class BitNode extends GeneralNode {
                 double[] trustAndRate = getPercentages(neighbor.node.getID());
 
                 if (trustAndRate[0] >= trustThreshold) {
-//                    if (neighborRates.size() < maxToUnchoke) {
-//                        neighborRates.put(neighbor, trustAndRate[1]);
-//                    } else {
-//
-//                        Map.Entry<Neighbor, Double> worse = neighborRates.entrySet().stream()
-//                                .min((neighbor1, neighbor2) -> Double.compare(neighbor1.getValue(),
-//                                                                            neighbor2.getValue()))
-//                                .get();
-//
-//                        if (worse != null && worse.getValue() < trustAndRate[1]) {
-//                            neighborRates.remove(worse.getKey());
-//                            neighborsToChoke.add(worse.getKey());
-//                            neighborRates.put(neighbor, trustAndRate[1]);
-//
-//                        }
-//
-//                    }
+                    //                    if (neighborRates.size() < maxToUnchoke) {
+                    //                        neighborRates.put(neighbor, trustAndRate[1]);
+                    //                    } else {
+                    //
+                    //                        Map.Entry<Neighbor, Double> worse = neighborRates
+                    // .entrySet().stream()
+                    //                                .min((neighbor1, neighbor2) -> Double
+                    // .compare(neighbor1.getValue(),
+                    //
+                    // neighbor2.getValue()))
+                    //                                .get();
+                    //
+                    //                        if (worse != null && worse.getValue() <
+                    // trustAndRate[1]) {
+                    //                            neighborRates.remove(worse.getKey());
+                    //                            neighborsToChoke.add(worse.getKey());
+                    //                            neighborRates.put(neighbor, trustAndRate[1]);
+                    //
+                    //                        }
+                    //
+                    //                    }
                     neighborRates.put(neighbor, trustAndRate[1]);
                 } else neighborsToChoke.add(neighbor);
             }
@@ -541,8 +561,8 @@ public class BitNode extends GeneralNode {
         for (int i = 0; i < maxToUnchoke; i++) {
             Map.Entry<Neighbor, Double> better = null;
             for (Map.Entry<Neighbor, Double> entry : neighborRates.entrySet()) {
-                if (better == null || (better.getValue() < entry.getValue()) && (((BitTorrent)entry
-                        .getKey().node.getProtocol(pid)).getPeerStatus() == 0 )){
+                if (better == null || (better.getValue() < entry.getValue()) && (((BitTorrent)
+                        entry.getKey().node.getProtocol(pid)).getPeerStatus() == 0)) {
                     better = entry;
                 }
             }
@@ -553,15 +573,19 @@ public class BitNode extends GeneralNode {
             }
         }
 
-//        neighborRates.keySet().forEach(this::unchoke);
-//        for (Neighbor neighbor : neighborRates.keySet()) {
-//            unchoke(neighbor);
-//        }
+        //        neighborRates.keySet().forEach(this::unchoke);
+        //        for (Neighbor neighbor : neighborRates.keySet()) {
+        //            unchoke(neighbor);
+        //        }
         neighborsToChoke.addAll(neighborRates.keySet());
-//        neighborsToChoke.forEach(this::choke);
+        //        neighborsToChoke.forEach(this::choke);
         for (Neighbor neighbor : neighborsToChoke) {
             choke(neighbor);
         }
 
+    }
+
+    enum Behaviour {
+        NORMAL, BAD_CHUNK, SLOW, FREE_RIDER
     }
 }

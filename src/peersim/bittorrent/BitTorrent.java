@@ -31,6 +31,8 @@ import peersim.transport.Transport;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -1211,9 +1213,11 @@ public class BitTorrent implements EDProtocol {
                                 + CommonState.getTime());
                         this.peerStatus = 1;
 
-                        try ( FileWriter fileWriter = new FileWriter("csv/s" + Network.size() +
-                                getUnchokingAlgorithm() + "_" + NetworkInitializer.nFreeRider +
-                                ".csv", true)) {
+                        Path file_path = Paths.get("log", String.valueOf(Network.size()), String
+                                .valueOf(unchokingAlgorithm), String.valueOf(NetworkInitializer
+                                .nFreeRider), "DownTimes.csv");
+
+                        try ( FileWriter fileWriter = new FileWriter(file_path.toFile(), true)) {
                             fileWriter.write(node.getID() + ";" + ((BitNode) node).getBehaviour()
                                     + ";" + CommonState.getTime() + "\n");
                         } catch (IOException e1) {

@@ -30,6 +30,10 @@ import peersim.edsim.EDSimulator;
 import peersim.transport.Transport;
 import peersim.util.IncrementalFreq;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Random;
 
 /**
@@ -141,26 +145,37 @@ public class NetworkInitializer implements Control {
 			}
 		}
 
-		((BitTorrent)Network.get(0).getProtocol(pid)).getUnchokingAlgorithm();
+		BitTorrent.Choke unchokingAlgorithm = ((BitTorrent)Network.get(0).getProtocol(pid))
+                .getUnchokingAlgorithm();
 
-		for(int i=1; i< Network.size(); i++){
-			BitNode n = (BitNode) Network.get(i);
-			long latency = ((Transport)n.getProtocol(tid)).getLatency(n,tracker);
-			Object ev = new SimpleMsg(TRACKER, n);
-			EDSimulator.add(latency,ev,tracker,pid);
-			ev = new SimpleEvent(CHOKE_TIME);
-			EDSimulator.add(10000,ev,n,pid);
-			ev = new SimpleEvent(OPTUNCHK_TIME);
-			EDSimulator.add(30000,ev,n,pid);
-			ev = new SimpleEvent(ANTISNUB_TIME);
-			EDSimulator.add(60000,ev,n,pid);
-			ev = new SimpleEvent(CHECKALIVE_TIME);
-			EDSimulator.add(120000,ev,n,pid);
-			ev = new SimpleEvent(TRACKERALIVE_TIME);
-			EDSimulator.add(1800000,ev,n,pid);
+        Path file_path = Paths.get("log", String.valueOf(Network.size()), String
+                .valueOf(unchokingAlgorithm), String.valueOf(NetworkInitializer
+                .nFreeRider), "NodeTypes.csv");
 
-			System.out.println("Node " + n.getID() + " is " + n.getBehaviour());
-		}
+        try (FileWriter fileWriter = new FileWriter(file_path.toString())) {
+            fileWriter.write("NodeID;NodeType");
+            for (int i = 1; i < Network.size(); i++) {
+                BitNode n = (BitNode) Network.get(i);
+                long latency = ((Transport) n.getProtocol(tid)).getLatency(n, tracker);
+                Object ev = new SimpleMsg(TRACKER, n);
+                EDSimulator.add(latency, ev, tracker, pid);
+                ev = new SimpleEvent(CHOKE_TIME);
+                EDSimulator.add(10000, ev, n, pid);
+                ev = new SimpleEvent(OPTUNCHK_TIME);
+                EDSimulator.add(30000, ev, n, pid);
+                ev = new SimpleEvent(ANTISNUB_TIME);
+                EDSimulator.add(60000, ev, n, pid);
+                ev = new SimpleEvent(CHECKALIVE_TIME);
+                EDSimulator.add(120000, ev, n, pid);
+                ev = new SimpleEvent(TRACKERALIVE_TIME);
+                EDSimulator.add(1800000, ev, n, pid);
+
+                System.out.println("Node " + n.getID() + " is " + n.getBehaviour());
+                fileWriter.write(n.getID() + ";" + n.getBehaviour());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 		return true;
 	}
 
