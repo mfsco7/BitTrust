@@ -1,4 +1,4 @@
-from os import mkdir
+from os import mkdir, remove
 from os.path import exists
 from random import randint
 from shutil import copyfile
@@ -9,8 +9,6 @@ from threading import Lock, Thread, current_thread
 import pandas
 from psutil import Popen, cpu_count
 
-import csv
-
 peersimLibraries = "../peersim-1.0.5/*"
 commonsmath35Library = "../commons-math3-3.5/commons-math3-3.5.jar"
 bitTrustOutDir = "out/production/BitTrust"
@@ -19,95 +17,54 @@ libraries = peersimLibraries + ":" + commonsmath35Library + ":" + bitTrustOutDir
 
 cfgFile = "conf/Time.conf"
 
-simulation = 0
+simulation = []
+down_times = []
 
 '''Confidence Level'''
 confidence = 0.95
 zvalue = 1.96
 min_interval_range = 0.05
 mis = min_interval_range / 2  # Min interval spread
-interval_spread = {}
+interval_spread = []
 
 '''Configuration parameters'''
 # network_sizes = [20, 30, 40, 50, 60, 70, 80, 90, 100]
 network_sizes = [30]
 # percentages_freeriders = [0, 10, 20, 30, 40, 50]
 percentages_freeriders = [0]
-# algorithms = ["original", "trust", "trust2"]
-algorithms = ["original"]
+# algorithms = ["ORIGINAL", "TRUST", "TRUST2"]
+algorithms = ["ORIGINAL"]
 
 
-def simulate(lock, tasklist):
+def simulate(lock, task_list: list) -> None:
     global simulation
 
     sim_group = 0
-    n_groups = len(tasklist)
+    n_groups = len(task_list)
 
     while sim_group < n_groups:
-        while simulation < 30 or not is_interval_small():
-            # TODO convert tasklist to a dict for better mapping
-
-            [net_size, algo, num_bad_nodes] = tasklist[sim_group]
+        while simulation[sim_group] < 30 or not is_interval_small():
+            task = task_list[sim_group]
 
             lock.acquire()
-            sim = simulation
+            sim = simulation[sim_group]
             rand_seed = randint(2 ** 30, 2 ** 34 - 1)
-            cfg_file2 = generate_conf_file(rand_seed, task=tasklist[sim_group])
+            cfg_file2 = generate_conf_file(rand_seed=rand_seed, task=task)
 
-            simulation += 1
+            simulation[sim_group] += 1
             print("sim %d starting in %s with %d nodes %s and %d" %
-                  (sim, current_thread().name, net_size, algo, num_bad_nodes))
+                  (sim, current_thread().name, task["net_size"], task["algo"], task["num_free"]))
             lock.release()
 
-            run_process(cfg_file2, task=tasklist[sim_group])
+            run_process(cfg_file2)
 
             lock.acquire()
-            parse_log_file()
-            check_conf_interval()
+            remove(cfg_file2)
+            avg = parse_log_files(task=task, seed=rand_seed)
+            check_conf_interval(avg, down_times[sim_group])
             lock.release()
 
         sim_group += 1
-
-    while True:
-        try:
-            lock.acquire(timeout=3)
-            sim = simulation
-            simulation += 1
-            lock.release()
-
-            if sim >= n_groups:
-                # print(threading.current_thread().name + " finishes")
-                break
-            else:
-
-                [num_nodes, algorithm2, nfreerider2] = tasklist[sim]
-                cfg_file2 = generate_conf_file(1234567890, num_nodes, algorithm2, nfreerider2)
-                print("simulation " + str(sim) + " starting in " + current_thread().name +
-                      " " + str(num_nodes) + " nodes " + str(algorithm2) + " " + str(nfreerider2) +
-                      " free riders")
-                # print(threading.current_thread().name + " " + cfg_file2)
-
-                last_time = run_process(cfg_file2, task=[num_nodes, algorithm2, nfreerider2])
-                # print(num_nodes, algorithm2, nfreerider2)
-
-                lock.acquire(timeout=3)
-
-                with open('csv/simulationTimes' + algorithm2 + '20160421.csv', 'a+', newline='') \
-                        as \
-                        csv_file2:
-                    writer2 = csv.writer(csv_file2, delimiter=';')
-                    row = [cfg_file2, nfreerider2] + [str(time) for time in last_time.values()]
-                    # print(row)
-                    writer2.writerow(row)
-                #
-                # writer2.writerow([cfg_file2] + [time for time in last_time.values()])
-                print("simulation " + str(sim) + " finishes")
-                lock.release()
-
-        except TimeoutError:
-            lock.release()
-
-    return
 
 
 def is_interval_small():
@@ -122,7 +79,7 @@ def is_interval_small():
 
 
 def generate_conf_file(rand_seed=1234567890, net_size=100, algorithmm='original',
-                       freerider=0, task: list = None):
+                       freerider=0, task: dict = None):
     """
     Make new configuration file based on template cfgFile. It will take a integer to
     be a random seed parameter and produce a file for passing to peersim simulator.
@@ -135,10 +92,10 @@ def generate_conf_file(rand_seed=1234567890, net_size=100, algorithmm='original'
     :return: Names of Configuration files
     """
     if task is not None:
-        net_size = task[0]
-        algorithmm = task[1]
-        freerider = task[2]
-    cfg_file2 = "conf/Time" + str(net_size) + algorithmm + "_" + str(freerider) + "f.conf"
+        net_size = task["net_size"]
+        algorithmm = task["algo"]
+        freerider = task["num_free"]
+    cfg_file2 = "conf/Time" + str(net_size) + "_" + algorithmm + "_" + str(freerider) + "f.conf"
     copyfile(cfgFile, cfg_file2)
     with open(cfg_file2, mode="a") as file:
         file.write("# This part was generated by the script\n")
@@ -150,112 +107,63 @@ def generate_conf_file(rand_seed=1234567890, net_size=100, algorithmm='original'
     return cfg_file2
 
 
-def run_process(cfg_file="conf/Time-1.conf", seed=1234567890, task: list = None):
+def run_process(cfg_file="conf/Time-1.conf") -> None:
     """
-    Creates nodeID new process and waits for it to end. After process termination it will fetch the
-    last node download time.
-
-    :param task:
+    Creates a new process and waits for it to end. The stdout and stderr are redirect to a pipe.
+    Since it waits for process completion, its a blocking function.
     :param cfg_file: Name of configuration file
-    :param seed:
-    :return: Time that last node took to fetch the file
     """
-    if task is None:
-        task = [30, "original", 0]
     p = Popen(["java", "-cp", libraries, "peersim.Simulator", cfg_file], stdout=PIPE, stderr=PIPE,
               universal_newlines=True)
     # p = Popen(["ls", cfg_file], stdout=PIPE, stderr=PIPE)
-
-    stdout = p.communicate()[0]
-    # stdout = '\n\nNode 2 is NORMAL\nNode 3 is NORMAL'
-    # last_peer = stdout.split(" at time ")[-1]
-    # last_time = int(last_peer.split('\n')[0])
-    #
-    # print(type(stdout))
-    # p.wait()
-    # stdout = stdout.decode("utf-8")
-
-    down_times = {}
-
-    nodes_completed = {}
-
-    algo = ""
-    if task[1] == "original":
-        algo = "ORIGINAL"
-    elif task[1] == 'trust':
-        algo = "TRUST"
-    elif task[1] == "trust2":
-        algo = "TRUST2"
-
-    csv_name = 'csv/' + str(task[0]) + algo + '_' + str(task[2]) + '.csv'
-    with open(csv_name, newline='') as \
-            csv_file_p:
-        spam_reader = csv.reader(csv_file_p, delimiter=';')
-        for row in spam_reader:
-            [node, node_type, time] = row
-            if node_type in down_times:
-                down_times[node_type] += [int(time)]
-            else:
-                down_times[node_type] = [int(time)]
-            nodes_completed[int(node)] = [True]
-    #
-    for n in range(2, task[0], 1):
-        if n not in nodes_completed:
-            string = "Node " + str(n) + " is "
-            temp0 = stdout.split(string)
-            temp = temp0[1]
-            n_type = temp.split("\n")[0]
-            if n_type not in down_times:
-                down_times[n_type] = [10 ** 7]
-            else:
-                down_times[n_type] += [10 ** 7]
-
-    for key in down_times.keys():
-        # print(key, down_times[key])
-        down_times[key] = sum(down_times[key]) / len(down_times[key])
-        # print(key, down_times[key])
-    # down_times = {'FREE_RIDER': 2000000, 'NORMAL': 1500000}
-    return down_times
+    p.wait()
 
 
-def parse_log_file(task: list, seed: int) -> dict:
+def parse_log_files(task: dict, seed: int) -> dict:
     """
-
+    Parse NodeTypes.csv and DownTimes.csv. Obtain type of nodes. Obtain download time of nodes
+    that finished. Obtain list of nodes that didn't completed, and for each add a big value as
+    download time. Group Download Time by NodeType and average it.
     :param task: net_size, algo, num freeriders
     :param seed: random seed used on simulation
-    :return: Avg of download time
+    :return: Avg of download time grouped by type
     """
-    folder_name = "log/%d/%s/%d/%d/" % (task[0], task[1], task[2], seed)
+    folder_name = "log/%d/%s/%d/%d/" % (task["net_size"], task["algo"], task["num_free"], seed)
 
     """ Obtain type of nodes """
     file_name = folder_name + "NodeTypes.csv"
     df = pandas.read_csv(file_name, sep=';')
 
-    """ Obtain download time, group by type and average it"""
+    """ Obtain download time of nodes that finished"""
     file_name2 = folder_name + "DownTimes.csv"
     df2 = pandas.read_csv(file_name2, sep=';')
 
+    """ Obtain list of nodes that didn't completed, and for each add a big value """
     nodes_left = diff(df['NodeID'].values, df2['NodeID'].values)
-    avg = df3.groupby('NodeType').mean()['DownTime']
+    for node in nodes_left:
+        node_type = df.query("NodeID == " + str(node))["NodeType"].values[0]
+        df2 = df2.append({"NodeID": node,
+                          "NodeType": node_type,
+                          "DownloadTime": 10 ** 7}, ignore_index=True)
 
-    with open(file_name2, 'r', newline='') as csv_file2:
-        reader = csv.reader(csv_file_p, delimiter=';')
-        for row in reader:
-            [node, node_type, time] = row
-            if node_type in down_times:
-                down_times[node_type] += [int(time)]
-            else:
-                down_times[node_type] = [int(time)]
-            nodes_completed[int(node)] = [True]
-        writer2 = csv.writer(csv_file2, delimiter=';')
-        row = [cfg_file2, nfreerider2] + [str(time) for time in last_time.values()]
-        # print(row)
-        writer2.writerow(row)
-    return ""
+    """ Group Download Time by NodeType and average it """
+    avg = df2.groupby('NodeType').mean()['DownTime']
+    return avg
 
 
-def check_conf_interval():
-    pass
+def check_conf_interval(avg: pandas.Series, down_time: dict) -> dict:
+    # TODO find a way to get node types dynamically
+    """
+
+    :param avg:
+    :param down_time:
+    """
+    for type in ["NORMAL", "FREERIDER"]:
+        if type not in down_time:
+            down_time[type] = [avg[type]]
+        down_time[type] += [avg[type]]
+        if len(down_time[type]) > 30:
+            calc_interval(down_time[type])
 
 
 def calc_interval(down_time: list):
@@ -276,7 +184,7 @@ def calc_interval(down_time: list):
     return error / mean0
 
 
-def diff(a: list, b: list)-> list:
+def diff(a: list, b: list) -> list:
     """
     This is a temporary function and it will serve its purpose until a better implemented
     function is found. Given two lists of any type, it will iterate through the biggest
@@ -287,14 +195,12 @@ def diff(a: list, b: list)-> list:
     :param b: Second list (recommend to be smallest)
     :return: List with elements belonging to biggest but not the smallest list
     """
-    c = []
     if len(a) < len(b):
         temp = a
         a = b
         b = temp
-    for e in a:
-        if e not in b:
-            c += [e]
+    s = set(b)
+    c = [x for x in a if x not in s]
     return c
 
 
@@ -308,7 +214,7 @@ if __name__ == '__main__':
     simulation = 0
     downtime = {'FREE_RIDER': [], 'NORMAL': []}
 
-    log_folder_name = "csv"
+    log_folder_name = "log"
     if not exists(log_folder_name):
         mkdir(log_folder_name, 0o744)
 
@@ -324,7 +230,11 @@ if __name__ == '__main__':
         for algorithm in algorithms:
             for percentage in percentages_freeriders:
                 num_freeriders = (percentage / 100) * nnodes
-                tasks += [[nnodes, algorithm, num_freeriders]]
+                # tasks += [[nnodes, algorithm, num_freeriders]]
+                tasks += [{"net_size": nnodes,
+                           "algo": algorithm,
+                           "num_free": num_freeriders}]
+                simulation += [0]
 
     for i in range(nProcessors):
         t.append(Thread(target=simulate, args=(locker, tasks)))
