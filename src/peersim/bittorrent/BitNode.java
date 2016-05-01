@@ -3,6 +3,7 @@ package peersim.bittorrent;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 import peersim.config.Configuration;
+import peersim.core.CommonState;
 import peersim.core.GeneralNode;
 import peersim.core.Network;
 import peersim.edsim.EDSimulator;
@@ -15,6 +16,7 @@ import utils.Interaction.TYPE;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -38,9 +40,19 @@ public class BitNode extends GeneralNode {
     private static final String PAR_PROT = "protocol";
     private static final String PAR_MAX_INTER = "max_interactions";
     private static final String PAR_DIRECT_WEIGHT = "direct_weight";
+    private static final String PAR_N_FREE_RIDER = "nFreeRider";
     private final int pid;
+    /**
+     * Half of bittorrent maximum bandwidth (download)
+     */
     private final int maxNumInteractionsPerPeer;
     private final float directWeight;
+
+    public int getnFreeRider() {
+        return nFreeRider;
+    }
+
+    private final int nFreeRider;
 
     FileWriter file_interaction;
     FileWriter file_blocks;
@@ -63,11 +75,23 @@ public class BitNode extends GeneralNode {
     public BitNode(String prefix) {
         super(prefix);
         pid = Configuration.getPid(prefix + "." + PAR_PROT);
-        maxNumInteractionsPerPeer = Configuration.getInt(prefix + "." + PAR_MAX_INTER, 624);
+
+        maxNumInteractionsPerPeer = Configuration.getInt(prefix + "." + PAR_MAX_INTER, 2560);
         directWeight = Configuration.getInt(prefix + "." + PAR_DIRECT_WEIGHT, 60) / 100f;
         interactions = new ArrayList<>();
         nodesDirectTrust = new HashMap<>();
         behaviour = Behaviour.NORMAL;
+        nFreeRider = Configuration.getInt(prefix + "." + PAR_N_FREE_RIDER);
+
+        Path folder_path = Paths.get("log", Integer.toString(Network.size()), ((BitTorrent)
+                getProtocol(pid)).getUnchokingAlgorithm().toString(), Integer.toString
+                (nFreeRider), String.valueOf(CommonState.r.getLastSeed()));
+
+        try {
+            Files.createDirectories(folder_path);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public Behaviour getBehaviour() {
@@ -248,10 +272,21 @@ public class BitNode extends GeneralNode {
         result.interactions = new ArrayList<>();
         result.nodesDirectTrust = new HashMap<>();
         try {
-
+//
             Path folder_path = Paths.get("log", Integer.toString(Network.size()), ((BitTorrent)
                     getProtocol(pid)).getUnchokingAlgorithm().toString(), Integer.toString
-                    (NetworkInitializer.nFreeRider));
+                    (nFreeRider), String.valueOf(CommonState.r.getLastSeed()));
+//
+//            File file = new File(String.valueOf(folder_path));
+//            if (!file.exists()) {
+//                try {
+//                    boolean dirs = file.getParentFile().mkdirs();
+//                    boolean fileCreated = file.createNewFile();
+//                    System.out.println(dirs + " " + fileCreated);
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
 
             result.file_interaction = new FileWriter(folder_path + File.separator +
                     "interactions_" + result.getID() + ".csv");

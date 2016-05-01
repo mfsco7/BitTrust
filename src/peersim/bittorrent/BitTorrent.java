@@ -1215,7 +1215,8 @@ public class BitTorrent implements EDProtocol {
 
                         Path file_path = Paths.get("log", String.valueOf(Network.size()), String
                                 .valueOf(unchokingAlgorithm), String.valueOf(NetworkInitializer
-                                .nFreeRider), "DownTimes.csv");
+                                .getnFreeRider()), String.valueOf(CommonState.r.getLastSeed()),
+                                "DownTimes.csv");
 
                         try ( FileWriter fileWriter = new FileWriter(file_path.toFile(), true)) {
                             fileWriter.write(node.getID() + ";" + ((BitNode) node).getBehaviour()

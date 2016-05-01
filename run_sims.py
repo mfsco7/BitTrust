@@ -1,4 +1,6 @@
-from os import mkdir, remove
+import csv
+from datetime import datetime
+from os import makedirs
 from os.path import exists
 from random import randint
 from shutil import copyfile
@@ -25,46 +27,96 @@ confidence = 0.95
 zvalue = 1.96
 min_interval_range = 0.05
 mis = min_interval_range / 2  # Min interval spread
-interval_spread = []
+interval_spread = {}
 
 '''Configuration parameters'''
 # network_sizes = [20, 30, 40, 50, 60, 70, 80, 90, 100]
 network_sizes = [30]
 # percentages_freeriders = [0, 10, 20, 30, 40, 50]
-percentages_freeriders = [0]
+percentages_freeriders = [10]
 # algorithms = ["ORIGINAL", "TRUST", "TRUST2"]
 algorithms = ["ORIGINAL"]
 
 
+def create_log_files(rand_seed, task):
+    folder_name = "log/%d/%s/%d/%d/" % (task["net_size"], task["algo"], task["num_free"], rand_seed)
+
+    if not exists(folder_name):
+        makedirs(folder_name)
+        # mkdir(folder_name, 0o744)
+
+    file_name = folder_name + "NodeTypes.csv"
+    with open(file_name, 'w+', newline='') as \
+            csv_file2:
+        writer2 = csv.writer(csv_file2, delimiter=';')
+
+        num_normal = int(task["net_size"] - task["num_free"])
+
+        writer2.writerow(["NodeID", "NodeType"])
+        for i in range(1, num_normal):
+            writer2.writerow([str(i), "NORMAL"])
+
+        for j in range(num_normal, num_normal + int(task["num_free"])):
+            writer2.writerow([str(j), "FREE_RIDER"])
+
+    file_name2 = folder_name + "DownTimes.csv"
+
+    with open(file_name2, 'w+', newline='') as \
+            csv_file2:
+        writer2 = csv.writer(csv_file2, delimiter=';')
+
+        writer2.writerow(["NodeID", "NodeType", "DownloadTime"])
+        for i in range(1, num_normal):
+            writer2.writerow([str(i), "NORMAL", randint(10 ** 6, 10 ** 7)])
+
+        for j in range(num_normal, num_normal + int(task["num_free"])):
+            writer2.writerow([str(j), "FREE_RIDER", randint(10 ** 6, 10 ** 7)])
+
+
 def simulate(lock, task_list: list) -> None:
-    global simulation
+    global simulation, down_times
 
     sim_group = 0
     n_groups = len(task_list)
 
+    time = datetime.now().strftime('%Y%m%d')
     while sim_group < n_groups:
-        while simulation[sim_group] < 30 or not is_interval_small():
-            task = task_list[sim_group]
+        down_times += [{"NORMAL": [], "FREE_RIDER": []}]
+        task = task_list[sim_group]
 
-            lock.acquire()
-            sim = simulation[sim_group]
-            rand_seed = randint(2 ** 30, 2 ** 34 - 1)
-            cfg_file2 = generate_conf_file(rand_seed=rand_seed, task=task)
+        file_name = "log/%d/%s/%d/st.csv" % (task["net_size"], task["algo"], task["num_free"])
+        with open(file_name, 'a', newline='') as csv_file2:
+            writer2 = csv.writer(csv_file2, delimiter=';')
 
-            simulation[sim_group] += 1
-            print("sim %d starting in %s with %d nodes %s and %d" %
-                  (sim, current_thread().name, task["net_size"], task["algo"], task["num_free"]))
-            lock.release()
+            while simulation[sim_group] < 30 or not is_interval_small():
+                lock.acquire()
+                sim = simulation[sim_group]
+                rand_seed = randint(2 ** 30, 2 ** 34 - 1)
+                print(rand_seed)
+                cfg_file2 = generate_conf_file(rand_seed=rand_seed, task=task)
 
-            run_process(cfg_file2)
+                simulation[sim_group] += 1
+                print("sim %d starting in %s with %d nodes %s and %d" %
+                      (
+                          sim, current_thread().name, task["net_size"], task["algo"],
+                          task["num_free"]))
+                lock.release()
 
-            lock.acquire()
-            remove(cfg_file2)
-            avg = parse_log_files(task=task, seed=rand_seed)
-            check_conf_interval(avg, down_times[sim_group])
-            lock.release()
+                # run_process(cfg_file2)
+                create_log_files(rand_seed, task)
 
-        sim_group += 1
+                lock.acquire()
+                # remove(cfg_file2)
+                avg = parse_log_files(task=task, seed=rand_seed)
+                check_conf_interval(avg, down_times[sim_group])
+                # TODO put the avg to a file
+                print([rand_seed] + [time for time in avg.values])
+                writer2.writerow([rand_seed] + [time for time in avg.values] + \
+                                 [amplitude for amplitude in interval_spread.values()])
+                csv_file2.flush()
+                lock.release()
+
+            sim_group += 1
 
 
 def is_interval_small():
@@ -95,14 +147,15 @@ def generate_conf_file(rand_seed=1234567890, net_size=100, algorithmm='original'
         net_size = task["net_size"]
         algorithmm = task["algo"]
         freerider = task["num_free"]
-    cfg_file2 = "conf/Time" + str(net_size) + "_" + algorithmm + "_" + str(freerider) + "f.conf"
+    cfg_file2 = "conf/Time" + str(net_size) + "_" + algorithmm + "_" + str(freerider) + "f" + \
+                str(rand_seed) + ".conf"
     copyfile(cfgFile, cfg_file2)
     with open(cfg_file2, mode="a") as file:
         file.write("# This part was generated by the script\n")
         file.write("random.seed " + str(rand_seed) + "\n")
         file.write("network.size " + str(net_size) + "\n")
         file.write("protocol.simulation.unchoking " + algorithmm + "\n")
-        file.write("init.net.nFreeRider " + str(freerider) + "\n")
+        file.write("network.node.nFreeRider " + str(freerider) + "\n")
 
     return cfg_file2
 
@@ -147,23 +200,27 @@ def parse_log_files(task: dict, seed: int) -> dict:
                           "DownloadTime": 10 ** 7}, ignore_index=True)
 
     """ Group Download Time by NodeType and average it """
-    avg = df2.groupby('NodeType').mean()['DownTime']
+    # TODO if no nodes with a specific type then dont divide
+    avg = df2.groupby('NodeType').mean()['DownloadTime']
     return avg
 
 
 def check_conf_interval(avg: pandas.Series, down_time: dict) -> dict:
-    # TODO find a way to get node types dynamically
     """
 
     :param avg:
     :param down_time:
-    """
-    for type in ["NORMAL", "FREERIDER"]:
-        if type not in down_time:
-            down_time[type] = [avg[type]]
-        down_time[type] += [avg[type]]
-        if len(down_time[type]) > 30:
-            calc_interval(down_time[type])
+    """  # TODO find a way to get node types dynamically
+    for node_type in ['NORMAL', "FREE_RIDER"]:
+        if node_type not in down_time:
+            down_time[node_type] = []
+
+        average = avg[node_type]
+        down_time[node_type] += [average]
+
+        if len(down_time[node_type]) > 30:
+            interval_spread[node_type] = calc_interval(down_time[node_type])
+            print(interval_spread[node_type])
 
 
 def calc_interval(down_time: list):
@@ -208,15 +265,14 @@ if __name__ == '__main__':
     locker = Lock()
 
     nProcessors = cpu_count()
-    # nProcessors = 16
+    # nProcessors = 2
 
     t = []
-    simulation = 0
     downtime = {'FREE_RIDER': [], 'NORMAL': []}
 
     log_folder_name = "log"
-    if not exists(log_folder_name):
-        mkdir(log_folder_name, 0o744)
+    # if not exists(log_folder_name):
+    #     mkdir(log_folder_name, 0o744)
 
     """ Creates new csv file or overwrites the old """
     # with open('csv/simulationTimes20160411.csv', 'w') as csv_file:
@@ -229,12 +285,23 @@ if __name__ == '__main__':
     for nnodes in network_sizes:
         for algorithm in algorithms:
             for percentage in percentages_freeriders:
+                """ convert freerider percentage to number of freeriders """
                 num_freeriders = (percentage / 100) * nnodes
-                # tasks += [[nnodes, algorithm, num_freeriders]]
+
                 tasks += [{"net_size": nnodes,
                            "algo": algorithm,
                            "num_free": num_freeriders}]
                 simulation += [0]
+
+                folder_name = "log/%d/%s/%d/" % (nnodes, algorithm, num_freeriders)
+                if not exists(folder_name):
+                    makedirs(folder_name)
+
+                file_name = folder_name + "st.csv"
+                with open(file_name, 'w', newline='') as csv_file2:
+                    writer = csv.writer(csv_file2, delimiter=';')
+                    writer.writerow(['Random Seed', "FreeRiderTime", 'NormalTime',
+                                     "FreeRiderSpread", "NormalSpread"])
 
     for i in range(nProcessors):
         t.append(Thread(target=simulate, args=(locker, tasks)))

@@ -30,8 +30,10 @@ import peersim.edsim.EDSimulator;
 import peersim.transport.Transport;
 import peersim.util.IncrementalFreq;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Random;
@@ -74,19 +76,20 @@ public class NetworkInitializer implements Control {
 
 	private final int nBadChunk;
 	private final int nSlow;
-	//TODO nFreeRider should be final
-	static int nFreeRider;
+	private static int nFreeRider;
 
 	private Random rnd;
 
 	public NetworkInitializer(String prefix) {
+		System.out.println("net init");
 		pid = Configuration.getPid(prefix+"."+PAR_PROT);
 		tid = Configuration.getPid(prefix+"."+PAR_TRANSPORT);
 		init = new NodeInitializer(prefix);
 
 		nBadChunk = Configuration.getInt(prefix + "." + PAR_N_BAD_CHUNK);
 		nSlow = Configuration.getInt(prefix + "." + PAR_N_SLOW);
-		nFreeRider = Configuration.getInt(prefix + "." + PAR_N_FREE_RIDER);
+//		nFreeRider = Configuration.getInt(prefix + "." + PAR_N_FREE_RIDER);
+		nFreeRider = ((BitNode) Network.get(1)).getnFreeRider();
 	}
 
 	public boolean execute() {
@@ -132,8 +135,7 @@ public class NetworkInitializer implements Control {
 
         if (nFreeRider > Network.size() - nSeeders - 1) {
             System.err.println("Number of FreeRiders settled is more than the nodes available," +
-                    " only " + (Network.size() - nSeeders - 1) + " nodes were configured as " +
-                    "FreeRiders");
+                    " only " + freeRidersLeft + " nodes were configured as " + "FreeRiders");
         }
         while (freeRidersLeft > 0) {
 			int random = CommonState.r.nextInt(Network.size()-1)+1;
@@ -145,15 +147,46 @@ public class NetworkInitializer implements Control {
 			}
 		}
 
-		BitTorrent.Choke unchokingAlgorithm = ((BitTorrent)Network.get(0).getProtocol(pid))
-                .getUnchokingAlgorithm();
+		String unchokingAlgorithm = String.valueOf(((BitTorrent) Network.get(0).getProtocol(pid))
+				.getUnchokingAlgorithm());
+		String seed = String.valueOf(CommonState.r.getLastSeed());
 
-        Path file_path = Paths.get("log", String.valueOf(Network.size()), String
-                .valueOf(unchokingAlgorithm), String.valueOf(NetworkInitializer
-                .nFreeRider), "NodeTypes.csv");
+		Path file_path = Paths.get("log", String.valueOf(Network.size()), unchokingAlgorithm,
+				String.valueOf(getnFreeRider()), seed, "NodeTypes.csv");
+		System.out.println(file_path + " it should be this");
 
-        try (FileWriter fileWriter = new FileWriter(file_path.toString())) {
-            fileWriter.write("NodeID;NodeType");
+		Path folder_path = Paths.get("log", Integer.toString(Network.size()), unchokingAlgorithm, Integer.toString
+				(NetworkInitializer.getnFreeRider()), String.valueOf(CommonState.r.getLastSeed()));
+
+//		Path folder_path = Paths.get("log", Integer.toString(Network.size()), ((BitTorrent)
+//				getProtocol(pid)).getUnchokingAlgorithm().toString(), Integer.toString
+//				(NetworkInitializer.getnFreeRider()), String.valueOf(CommonState.r.getLastSeed()));
+
+		try {
+			Files.createDirectories(folder_path);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+//		result.file_interaction = new FileWriter(folder_path + File.separator +
+//				"interactions_" + result.getID() + ".csv");
+		String file_path2 = folder_path + File.separator + "NodeTypes.csv";
+		String file_path3 = folder_path + File.separator + "DownTimes.csv";
+		File dir = new File(folder_path.toString());
+		boolean exist = dir.exists();
+		File file = new File(file_path2);
+		File file2 = new File(file_path3);
+		try {
+			file.createNewFile();
+			file2.createNewFile();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		try (FileWriter fileWriter = new FileWriter(file_path2); FileWriter fileWriter1 = new
+				FileWriter(file_path3)
+		) {
+            fileWriter.write("NodeID;NodeType\n");
             for (int i = 1; i < Network.size(); i++) {
                 BitNode n = (BitNode) Network.get(i);
                 long latency = ((Transport) n.getProtocol(tid)).getLatency(n, tracker);
@@ -171,8 +204,9 @@ public class NetworkInitializer implements Control {
                 EDSimulator.add(1800000, ev, n, pid);
 
                 System.out.println("Node " + n.getID() + " is " + n.getBehaviour());
-                fileWriter.write(n.getID() + ";" + n.getBehaviour());
+                fileWriter.write(n.getID() + ";" + n.getBehaviour()+ "\n");
             }
+			fileWriter1.write("NodeID;NodeType;DownloadTime\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -198,4 +232,16 @@ public class NetworkInitializer implements Control {
 		return nodeStatusStats;
 	}
 
+
+	public int getnBadChunk() {
+		return nBadChunk;
+	}
+
+	public int getnSlow() {
+		return nSlow;
+	}
+
+	public static int getnFreeRider() {
+		return nFreeRider;
+	}
 	}
