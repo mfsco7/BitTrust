@@ -68,9 +68,9 @@ def create_log_files(rand_seed, task):
         writer2.writerow(["NodeID", "NodeType", "DownloadTime"])
         for i in range(1, num_normal):
             writer2.writerow([str(i), "NORMAL", randint(10 ** 6, 10 ** 7)])
-
-        for j in range(num_normal, num_normal + int(task["num_free"])):
-            writer2.writerow([str(j), "FREE_RIDER", randint(10 ** 6, 10 ** 7)])
+        #
+        # for j in range(num_normal, num_normal + int(task["num_free"])):
+        #     writer2.writerow([str(j), "FREE_RIDER", randint(10 ** 6, 10 ** 7)])
 
 
 def simulate(lock, task_list: list) -> None:
@@ -91,7 +91,7 @@ def simulate(lock, task_list: list) -> None:
             while simulation[sim_group] < 30 or not is_interval_small():
                 lock.acquire()
                 sim = simulation[sim_group]
-                rand_seed = randint(2 ** 30, 2 ** 34 - 1)
+                rand_seed = randint(1, 2 ** 34 - 1)
                 print(rand_seed)
                 cfg_file2 = generate_conf_file(rand_seed=rand_seed, task=task)
 
@@ -102,8 +102,8 @@ def simulate(lock, task_list: list) -> None:
                           task["num_free"]))
                 lock.release()
 
-                # run_process(cfg_file2)
-                create_log_files(rand_seed, task)
+                run_process(cfg_file2)
+                # create_log_files(rand_seed, task)
 
                 lock.acquire()
                 # remove(cfg_file2)
@@ -172,7 +172,7 @@ def run_process(cfg_file="conf/Time-1.conf") -> None:
     p.wait()
 
 
-def parse_log_files(task: dict, seed: int) -> dict:
+def parse_log_files(task: dict, seed: int) -> pandas.Series:
     """
     Parse NodeTypes.csv and DownTimes.csv. Obtain type of nodes. Obtain download time of nodes
     that finished. Obtain list of nodes that didn't completed, and for each add a big value as
@@ -194,7 +194,8 @@ def parse_log_files(task: dict, seed: int) -> dict:
     """ Obtain list of nodes that didn't completed, and for each add a big value """
     nodes_left = diff(df['NodeID'].values, df2['NodeID'].values)
     for node in nodes_left:
-        node_type = df.query("NodeID == " + str(node))["NodeType"].values[0]
+        node_type = df[df.NodeID == node].NodeType.values[0] # .values converts to an array
+        #node_type = df.query("NodeID == " + str(node))["NodeType"].values[0]
         df2 = df2.append({"NodeID": node,
                           "NodeType": node_type,
                           "DownloadTime": 10 ** 7}, ignore_index=True)
