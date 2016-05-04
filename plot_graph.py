@@ -6,15 +6,15 @@ node_type = "normal"
 trust_algorithm = 1
 # trust_algorithm = 2
 
-csv_folder = "/home/aferreira/Documentos/Hyrax/"
+csv_folder = "log/30/"
 
-df = pd.read_csv(csv_folder + "st20160407Original.csv", sep=";")
+df = pd.read_csv(csv_folder + "ORIGINAL/st.csv", sep=";")
 
 if trust_algorithm == 1:
-    df2 = pd.read_csv(csv_folder + "st20160407Trust.csv", sep=";")
+    df2 = pd.read_csv(csv_folder + "TRUST/st.csv", sep=";")
 else:
     '''if talgorithm == 2'''
-    df2 = pd.read_csv(csv_folder + "st20160407Trust2.csv", sep=";")
+    df2 = pd.read_csv(csv_folder + "TRUST2/st.csv", sep=";")
 
 x = df['n freerider']
 x2 = df2['n freerider']
