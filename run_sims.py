@@ -2,7 +2,7 @@ import csv
 from datetime import datetime
 from os import makedirs
 from os.path import exists
-from random import randint
+from random import randint, SystemRandom
 from shutil import copyfile
 from statistics import stdev, mean
 from subprocess import PIPE
@@ -68,9 +68,9 @@ def create_log_files(rand_seed, task):
         writer2.writerow(["NodeID", "NodeType", "DownloadTime"])
         for i in range(1, num_normal):
             writer2.writerow([str(i), "NORMAL", randint(10 ** 6, 10 ** 7)])
-        #
-        # for j in range(num_normal, num_normal + int(task["num_free"])):
-        #     writer2.writerow([str(j), "FREE_RIDER", randint(10 ** 6, 10 ** 7)])
+            #
+            # for j in range(num_normal, num_normal + int(task["num_free"])):
+            #     writer2.writerow([str(j), "FREE_RIDER", randint(10 ** 6, 10 ** 7)])
 
 
 def simulate(lock, task_list: list) -> None:
@@ -85,14 +85,15 @@ def simulate(lock, task_list: list) -> None:
         task = task_list[sim_group]
 
         file_name = "log/%d/%s/%d/st.csv" % (task["net_size"], task["algo"], task["num_free"])
+        print("Download Times and Interval Spreads are on ", file_name)
         with open(file_name, 'a', newline='') as csv_file2:
             writer2 = csv.writer(csv_file2, delimiter=';')
 
             while simulation[sim_group] < 30 or not is_interval_small():
                 lock.acquire()
                 sim = simulation[sim_group]
-                rand_seed = randint(1, 2 ** 34 - 1)
-                print(rand_seed)
+                # rand_seed = randint(1, 2 ** 34 - 1)
+                rand_seed = SystemRandom().randint(1, 2 ** 34 - 1)
                 cfg_file2 = generate_conf_file(rand_seed=rand_seed, task=task)
 
                 simulation[sim_group] += 1
@@ -109,8 +110,6 @@ def simulate(lock, task_list: list) -> None:
                 # remove(cfg_file2)
                 avg = parse_log_files(task=task, seed=rand_seed)
                 check_conf_interval(avg, down_times[sim_group])
-                # TODO put the avg to a file
-                print([rand_seed] + [time for time in avg.values])
                 writer2.writerow([rand_seed] + [time for time in avg.values] + \
                                  [amplitude for amplitude in interval_spread.values()])
                 csv_file2.flush()
@@ -194,14 +193,13 @@ def parse_log_files(task: dict, seed: int) -> pandas.Series:
     """ Obtain list of nodes that didn't completed, and for each add a big value """
     nodes_left = diff(df['NodeID'].values, df2['NodeID'].values)
     for node in nodes_left:
-        node_type = df[df.NodeID == node].NodeType.values[0] # .values converts to an array
-        #node_type = df.query("NodeID == " + str(node))["NodeType"].values[0]
+        node_type = df[df.NodeID == node].NodeType.values[0]  # .values converts to an array
+        # node_type = df.query("NodeID == " + str(node))["NodeType"].values[0]
         df2 = df2.append({"NodeID": node,
                           "NodeType": node_type,
                           "DownloadTime": 10 ** 7}, ignore_index=True)
 
     """ Group Download Time by NodeType and average it """
-    # TODO if no nodes with a specific type then dont divide
     avg = df2.groupby('NodeType').mean()['DownloadTime']
     return avg
 
