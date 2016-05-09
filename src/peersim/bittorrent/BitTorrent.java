@@ -408,15 +408,15 @@ public class BitTorrent implements EDProtocol {
                 "." + PAR_DUP_REQ);
         maxGrowth = (int) Configuration.getInt(prefix + "." + PAR_MAX_GROWTH);
         nMaxNodes = Network.getCapacity() - 1;
-        String tmp = Configuration.getString(prefix + "." + PAR_UNCHOKING_ALGORITHM, "original");
+        String tmp = Configuration.getString(prefix + "." + PAR_UNCHOKING_ALGORITHM, "ORIGINAL");
         switch (tmp) {
-            case "original":
+            case "ORIGINAL":
                 unchokingAlgorithm = Choke.ORIGINAL;
                 break;
-            case "trust":
+            case "TRUST":
                 unchokingAlgorithm = Choke.TRUST;
                 break;
-            case "trust2":
+            case "TRUST2":
                 unchokingAlgorithm = Choke.TRUST2;
                 break;
             default:
