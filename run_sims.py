@@ -1,15 +1,14 @@
 import csv
+import pandas
 from datetime import datetime
 from os import makedirs
 from os.path import exists
+from psutil import Popen, cpu_count
 from random import randint, SystemRandom
 from shutil import copyfile
 from statistics import stdev, mean
 from subprocess import PIPE
 from threading import Lock, Thread, current_thread
-
-import pandas
-from psutil import Popen, cpu_count
 
 peersimLibraries = "../peersim-1.0.5/*"
 commonsmath35Library = "../commons-math3-3.5/commons-math3-3.5.jar"
@@ -27,7 +26,7 @@ confidence = 0.95
 zvalue = 1.96
 min_interval_range = 0.05
 mis = min_interval_range / 2  # Min interval spread
-interval_spread = {}
+interval_spread = []
 
 '''Configuration parameters'''
 # network_sizes = [20, 30, 40, 50, 60, 70, 80, 90, 100]
@@ -74,7 +73,7 @@ def create_log_files(rand_seed, task):
 
 
 def simulate(lock, task_list: list) -> None:
-    global simulation, down_times
+    global simulation, down_times, interval_spread
 
     sim_group = 0
     n_groups = len(task_list)
@@ -85,16 +84,20 @@ def simulate(lock, task_list: list) -> None:
         task = task_list[sim_group]
 
         file_name = "log/%d/%s/%d/st.csv" % (task["net_size"], task["algo"], task["num_free"])
-        print("Download Times and Interval Spreads are on ", file_name)
+        if simulation[sim_group] == 0:
+            print("Download Times and Interval Spreads are on ", file_name)
         with open(file_name, 'a', newline='') as csv_file2:
             writer2 = csv.writer(csv_file2, delimiter=';')
 
-            while simulation[sim_group] < 30 or not is_interval_small():
+            while simulation[sim_group] < 30 or not is_interval_small(interval_spread[sim_group]):
                 lock.acquire()
                 sim = simulation[sim_group]
                 # rand_seed = randint(1, 2 ** 34 - 1)
                 rand_seed = SystemRandom().randint(1, 2 ** 34 - 1)
                 cfg_file2 = generate_conf_file(rand_seed=rand_seed, task=task)
+
+                if len(interval_spread) <= sim_group:
+                    interval_spread += [{}]
 
                 simulation[sim_group] += 1
                 print("sim %d starting in %s with %d nodes %s and %d" %
@@ -103,27 +106,33 @@ def simulate(lock, task_list: list) -> None:
                           task["num_free"]))
                 lock.release()
 
-                run_process(cfg_file2)
-                # create_log_files(rand_seed, task)
+                # run_process(cfg_file2)
+                create_log_files(rand_seed, task)
 
                 lock.acquire()
                 # remove(cfg_file2)
                 avg = parse_log_files(task=task, seed=rand_seed)
-                check_conf_interval(avg, down_times[sim_group])
+                check_conf_interval(avg, down_times[sim_group], interval_spread[sim_group])
                 writer2.writerow([rand_seed] + [time for time in avg.values] + \
-                                 [amplitude for amplitude in interval_spread.values()])
+                                 [amplitude for amplitude in interval_spread[sim_group].values()])
                 csv_file2.flush()
                 lock.release()
 
-            sim_group += 1
+        # file_name_avg = "log/%d/%s/st.csv" % (task["net_size"], task["algo"])
+        # with open(file_name_avg, 'a', newline='') as csv_file2:
+        #     writer2 = csv.writer(csv_file2, delimiter=';')
+        #     writer2.writerow([sim_group, task["num_free"]] + [time for time in down_times[
+        #         sim_group].values()])
+        sim_group += 1
+        print("%s finishing execution" % current_thread().name)
 
 
-def is_interval_small():
+def is_interval_small(interval: dict):
     """
     Check, for all types of nodes, if the interval amplitude is smaller than it is desired
     :return:  True if interval amplitude is smaller, False otherwise
     """
-    for interval in interval_spread.values():
+    for interval in interval.values():
         if interval > mis:
             return False
     return True
@@ -197,18 +206,19 @@ def parse_log_files(task: dict, seed: int) -> pandas.Series:
         # node_type = df.query("NodeID == " + str(node))["NodeType"].values[0]
         df2 = df2.append({"NodeID": node,
                           "NodeType": node_type,
-                          "DownloadTime": 10 ** 7}, ignore_index=True)
+                          "DownloadTime": float(10 ** 7)}, ignore_index=True)
 
     """ Group Download Time by NodeType and average it """
     avg = df2.groupby('NodeType').mean()['DownloadTime']
     return avg
 
 
-def check_conf_interval(avg: pandas.Series, down_time: dict) -> dict:
+def check_conf_interval(avg: pandas.Series, down_time: dict, interval: dict) -> dict:
     """
 
     :param avg:
     :param down_time:
+    :param interval:
     """  # TODO find a way to get node types dynamically
     for node_type in ['NORMAL', "FREE_RIDER"]:
         if node_type not in down_time:
@@ -217,9 +227,9 @@ def check_conf_interval(avg: pandas.Series, down_time: dict) -> dict:
         average = avg[node_type]
         down_time[node_type] += [average]
 
-        if len(down_time[node_type]) > 30:
-            interval_spread[node_type] = calc_interval(down_time[node_type])
-            print(interval_spread[node_type])
+        if len(down_time[node_type]) > 3:
+            interval[node_type] = calc_interval(down_time[node_type])
+            # print(interval[node_type])
 
 
 def calc_interval(down_time: list):
