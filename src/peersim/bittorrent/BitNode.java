@@ -19,10 +19,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 import static utils.Interaction.RESULT.*;
 
@@ -41,6 +38,7 @@ public class BitNode extends GeneralNode {
     private static final String PAR_MAX_INTER = "max_interactions";
     private static final String PAR_DIRECT_WEIGHT = "direct_weight";
     private static final String PAR_N_FREE_RIDER = "nFreeRider";
+    private static final String PAR_LOG_PATH = "log_path";
     private final int pid;
     /**
      * Half of bittorrent maximum bandwidth (download)
@@ -62,7 +60,11 @@ public class BitNode extends GeneralNode {
     private ArrayList<Interaction> interactions;
     private HashMap<Long, HashMap<Long, Double>> nodesDirectTrust;
     private Behaviour behaviour;
+    static String log_path;
 
+
+    public HashMap<Long, HashMap<Long, Integer>> neighDownloadInteractions;
+    public HashMap<Long, HashMap<Long, Integer>> neighUploadInteractions;
     //    /**
     //     * Used to construct the prototype node. This class currently does not
     //     * have specific configuration parameters and so the parameter
@@ -81,17 +83,16 @@ public class BitNode extends GeneralNode {
         interactions = new ArrayList<>();
         nodesDirectTrust = new HashMap<>();
         behaviour = Behaviour.NORMAL;
-        nFreeRider = Configuration.getInt(prefix + "." + PAR_N_FREE_RIDER);
+        nFreeRider = Configuration.getInt(prefix + "." + PAR_N_FREE_RIDER, 0);
 
-        Path folder_path = Paths.get("log", Integer.toString(Network.size()), ((BitTorrent)
-                getProtocol(pid)).getUnchokingAlgorithm().toString(), Integer.toString
-                (nFreeRider), String.valueOf(CommonState.r.getLastSeed()));
+        log_path = Configuration.getString(prefix + "." + PAR_LOG_PATH, "log");
 
         try {
-            Files.createDirectories(folder_path);
+            Files.createDirectories(Paths.get(log_path));
         } catch (IOException e) {
             e.printStackTrace();
         }
+        System.out.println();
     }
 
     public Behaviour getBehaviour() {
@@ -131,22 +132,22 @@ public class BitNode extends GeneralNode {
         return true;
     }
 
-    //    private static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
-    //        List list = new LinkedList<>(map.entrySet());
-    //        // Defined Custom Comparator here
-    //        Collections.sort(list, (o1, o2) -> ((Comparable) ((Map.Entry) (o1)).getValue())
-    // .compareTo(((Map.Entry) (o2))
-    //                .getValue()));
-    //
-    //        // Here I am copying the sorted list in HashMap
-    //        // using LinkedHashMap to preserve the insertion order
-    //        HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
-    //        for (Iterator it = list.iterator(); it.hasNext(); ) {
-    //            Map.Entry entry = (Map.Entry) it.next();
-    //            sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
-    //        }
-    //        return sortedHashMap;
-    //    }
+        static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
+            List list = new LinkedList<>(map.entrySet());
+            // Defined Custom Comparator here
+            Collections.sort(list, (o1, o2) -> ((Comparable) ((Map.Entry) (o1)).getValue())
+     .compareTo(((Map.Entry) (o2))
+                    .getValue()));
+
+            // Here I am copying the sorted list in HashMap
+            // using LinkedHashMap to preserve the insertion order
+            HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
+            for (Iterator it = list.iterator(); it.hasNext(); ) {
+                Map.Entry entry = (Map.Entry) it.next();
+                sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
+            }
+            return sortedHashMap;
+        }
 
     public void removeOnLimit(long nodeID, TYPE type) {
 
@@ -251,19 +252,19 @@ public class BitNode extends GeneralNode {
         }
     }
 
-    //    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
-    //
-    //        HashMap<Long, Integer> sortedInteractions = new HashMap<>();
-    //
-    //        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-    //            if (neighbor != null && neighbor.node != null) {
-    //                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions
-    // (neighbor.node
-    //                        .getID(), type, GOOD));
-    //            }
-    //        }
-    //        return sortByValues(sortedInteractions);
-    //    }
+        public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
+
+            HashMap<Long, Integer> sortedInteractions = new HashMap<>();
+
+            for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+                if (neighbor != null && neighbor.node != null) {
+                    sortedInteractions.put(neighbor.node.getID(), getNumberInteractions
+     (neighbor.node
+                            .getID(), type, GOOD));
+                }
+            }
+            return sortByValues(sortedInteractions);
+        }
 
     @Override
     public Object clone() {
@@ -288,30 +289,33 @@ public class BitNode extends GeneralNode {
 //                }
 //            }
 
-            result.file_interaction = new FileWriter(folder_path + File.separator +
+            result.file_interaction = new FileWriter(log_path + File.separator +
                     "interactions_" + result.getID() + ".csv");
             //            result.file_interaction = new FileWriter("csv/interactions_" + result
             // .getID() + ".csv");
             result.file_interaction.write("time;nodeID;result;type;blockID\n");
 
-            result.file_blocks = new FileWriter(folder_path + File.separator + "blocks_" +
+            result.file_blocks = new FileWriter(log_path + File.separator + "blocks_" +
                     result.getID() + ".csv");
             result.file_blocks.write("receiveTime;nodeId;value;requestTime\n");
 
-            result.file_requests = new FileWriter(folder_path + File.separator + "requestsA_" +
+            result.file_requests = new FileWriter(log_path + File.separator + "requestsA_" +
                     result.getID() + "" + ".csv");
             result.file_requests.write("requestTime;sender;blockID;receiveTime;receiver\n");
 
-            result.messagesFile = new FileWriter(folder_path + File.separator + "messages_" +
+            result.messagesFile = new FileWriter(log_path + File.separator + "messages_" +
                     result.getID() + ".csv");
             result.messagesFile.write("Time;Sender;Type\n");
 
-            result.reputationFile = new FileWriter(folder_path + File.separator + "reputation_" +
+            result.reputationFile = new FileWriter(log_path + File.separator + "reputation_" +
                     result.getID() + ".csv");
             result.reputationFile.write("Node;DTP;RP;ITP;CRP;TTP;TRP\n");
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        result.neighUploadInteractions = new HashMap<>();
+        result.neighDownloadInteractions = new HashMap<>();
         return result;
     }
 

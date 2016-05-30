@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import static utils.Interaction.RESULT.SENT;
@@ -663,7 +664,13 @@ public class BitTorrent implements EDProtocol {
                                     lastInterested = piece;
                                     if (alive(cache[j].node) && swarm[j][piece] == 1) {
 
-                                        ev = new IntMsg(INTERESTED, node, lastInterested);
+//                                        ev = new IntMsg(INTERESTED, node, lastInterested);
+                                        HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
+                                                .getSortedInteractions(DOWNLOAD);
+                                        HashMap<Long, Integer> uploadInteractions = ((BitNode) node)
+                                                .getSortedInteractions(UPLOAD);
+                                        ev = new InterestMsg(node, lastInterested, CommonState.getTime(),
+                                                downloadInteractions, uploadInteractions);
                                         latency = ((Transport) node.getProtocol(tid)).getLatency
                                                 (node, cache[j].node);
                                         EDSimulator.add(latency, ev, cache[j].node, pid);
@@ -755,6 +762,11 @@ public class BitTorrent implements EDProtocol {
                 //System.out.println("process, interested: sender is "+sender
                 // .getID()+", local is "+node.getID());
                 int value = ((IntMsg) event).getInt();
+                //TODO see time of interest msg to see if a older msg is receive
+                ((BitNode) node).neighDownloadInteractions.put(sender.getID(), ((InterestMsg)
+                        event).getDownload());
+                ((BitNode) node).neighUploadInteractions.put(sender.getID(), ((InterestMsg)
+                        event).getUpload());
                 Element e = search(sender.getID());
                 if (e != null) {
                     cache[e.peer].isAlive();
@@ -872,7 +884,13 @@ public class BitTorrent implements EDProtocol {
                                 if (piece == -1) return;
                                 lastInterested = piece;
                                 currentPiece = lastInterested;
-                                ev = new IntMsg(INTERESTED, node, lastInterested);
+//                                ev = new IntMsg(INTERESTED, node, lastInterested);
+                                HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
+                                                        .getSortedInteractions(DOWNLOAD);
+                                HashMap<Long, Integer> uploadInteractions = ((BitNode) node)
+                                        .getSortedInteractions(UPLOAD);
+                                ev = new InterestMsg(node, lastInterested, CommonState.getTime(),
+                                        downloadInteractions, uploadInteractions);
                                 for (int i = 0; i < swarmSize; i++) {// send
                                     // the interested message to those
                                     // nodes which have that piece
@@ -920,7 +938,13 @@ public class BitTorrent implements EDProtocol {
                                 if (piece == -1) return;
                                 lastInterested = piece;
                                 currentPiece = lastInterested;
-                                ev = new IntMsg(INTERESTED, node, lastInterested);
+//                                ev = new IntMsg(INTERESTED, node, lastInterested);
+                                HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
+                                        .getSortedInteractions(DOWNLOAD);
+                                HashMap<Long, Integer> uploadInteractions = ((BitNode) node)
+                                        .getSortedInteractions(UPLOAD);
+                                ev = new InterestMsg(node, lastInterested, CommonState.getTime(),
+                                        downloadInteractions, uploadInteractions);
                                 for (int i = 0; i < swarmSize; i++) {// send
                                     // the interested message to those
                                     // nodes which have that piece
@@ -1213,10 +1237,7 @@ public class BitTorrent implements EDProtocol {
                                 + CommonState.getTime());
                         this.peerStatus = 1;
 
-                        Path file_path = Paths.get("log", String.valueOf(Network.size()), String
-                                .valueOf(unchokingAlgorithm), String.valueOf(NetworkInitializer
-                                .getnFreeRider()), String.valueOf(CommonState.r.getLastSeed()),
-                                "DownTimes.csv");
+                        Path file_path = Paths.get(BitNode.log_path, "DownTimes.csv");
 
                         try ( FileWriter fileWriter = new FileWriter(file_path.toFile(), true)) {
                             fileWriter.write(node.getID() + ";" + ((BitNode) node).getBehaviour()
@@ -1451,7 +1472,57 @@ public class BitTorrent implements EDProtocol {
                         }
                         break;
                     case TRUST:
-                        ((BitNode) node).unchokingAlgorithm();
+                        HashMap<Long, Integer> points = new HashMap<>();
+                        if (peerStatus == 1) {
+                            for (HashMap<Long, Integer> neighInteractions : ((BitNode) node)
+                                    .neighUploadInteractions.values()) {
+                                //TODO change i
+                                int i = getCache().length;
+                                for (Long nodeID : neighInteractions.keySet()) {
+                                    int point = points.get(nodeID) != null ? points.get(nodeID) :
+                                            0;
+                                    points.put(nodeID, point + i--);
+                                }
+                            }
+                            BitNode.sortByValues(points);
+
+                            int nodesUnchoked = 4;
+
+                            Iterator<Long> iterator = points.keySet().iterator();
+                            while (iterator.hasNext() && nodesUnchoked > 0) {
+                                Long nodeID = iterator.next();
+                                Neighbor neighbor = null;
+                                for (Neighbor neigh : getCache()) {
+                                    if (neigh != null && neigh.node != null && nodeID.equals
+                                            (neigh.node.getID())) {
+                                        neighbor = neigh;
+                                    }
+                                }
+                                if (neighbor != null) {
+                                    ((BitNode) node).unchoke(neighbor);
+                                    nodesUnchoked--;
+
+
+                                }
+                                iterator.remove();
+                            }
+
+                            for (Long nodeID : points.keySet()) {
+                                Neighbor neighbor = null;
+                                for (Neighbor neigh : getCache()) {
+                                    if (neigh != null && neigh.node != null && nodeID.equals
+                                            (neigh.node.getID())) {
+                                        neighbor = neigh;
+                                        break;
+                                    }
+                                }
+                                if (neighbor != null && neighbor.node != null)
+                                    ((BitNode) node).choke(neighbor);
+                            }
+
+                        } else
+
+                            ((BitNode) node).unchokingAlgorithm();
                         break;
                     case TRUST2:
                         ((BitNode) node).unchokingAlgorithm2();
@@ -1594,7 +1665,13 @@ public class BitTorrent implements EDProtocol {
                         if (e != null && unchokedBy[e.peer]) { //if I know the sender
                             cache[e.peer].isAlive();
 
-                            ev = new IntMsg(INTERESTED, node, lastInterested);
+//                            ev = new IntMsg(INTERESTED, node, lastInterested);
+                            HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
+                                    .getSortedInteractions(DOWNLOAD);
+                            HashMap<Long, Integer> uploadInteractions = ((BitNode) node)
+                                    .getSortedInteractions(UPLOAD);
+                            ev = new InterestMsg(node, lastInterested, CommonState.getTime(),
+                                    downloadInteractions, uploadInteractions);
 
                             latency = ((Transport) node.getProtocol(tid)).getLatency(node, sender);
                             EDSimulator.add(latency, ev, neighbor.node, pid);
@@ -1891,7 +1968,7 @@ public class BitTorrent implements EDProtocol {
                 // block, CommonState
                 //                        .getTime());
 //                HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
-//                        .getSortedInteractions(DOWNLOAD);
+                //                        .getSortedInteractions(DOWNLOAD);
                 RequestMsg ev = new RequestMsg(node, block, CommonState.getTime(),
                         null, null);
                 long latency = ((Transport) node.getProtocol(tid)).getLatency(node, cache[sender]
@@ -1953,7 +2030,13 @@ public class BitTorrent implements EDProtocol {
             }
 
             lastInterested = newPiece;
-            Object ev = new IntMsg(INTERESTED, node, lastInterested);
+//            Object ev = new IntMsg(INTERESTED, node, lastInterested);
+            HashMap<Long, Integer> downloadInteractions = ((BitNode) node)
+                    .getSortedInteractions(DOWNLOAD);
+            HashMap<Long, Integer> uploadInteractions = ((BitNode) node)
+                    .getSortedInteractions(UPLOAD);
+            Object ev = new InterestMsg(node, lastInterested, CommonState.getTime(),
+                    downloadInteractions, uploadInteractions);
 
             for (int j = 0; j < swarmSize; j++) {// send the interested
                 // message to
