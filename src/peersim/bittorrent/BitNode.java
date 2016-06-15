@@ -2,6 +2,7 @@ package peersim.bittorrent;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
+import org.apache.commons.math3.util.Pair;
 import peersim.config.Configuration;
 import peersim.core.CommonState;
 import peersim.core.GeneralNode;
@@ -63,8 +64,8 @@ public class BitNode extends GeneralNode {
     static String log_path;
 
 
-    public HashMap<Long, HashMap<Long, Integer>> neighDownloadInteractions;
-    public HashMap<Long, HashMap<Long, Integer>> neighUploadInteractions;
+    public HashMap<Long, Pair<Long, Integer>> neighDownloadInteractions;
+    public HashMap<Long, Pair<Long, Integer>> neighUploadInteractions;
     //    /**
     //     * Used to construct the prototype node. This class currently does not
     //     * have specific configuration parameters and so the parameter
@@ -152,6 +153,8 @@ public class BitNode extends GeneralNode {
             }
             return sortedHashMap;
         }
+
+
 
     public void removeOnLimit(long nodeID, TYPE type) {
 
@@ -256,19 +259,34 @@ public class BitNode extends GeneralNode {
         }
     }
 
-        public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
+    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
 
-            HashMap<Long, Integer> sortedInteractions = new HashMap<>();
+        HashMap<Long, Integer> sortedInteractions = new HashMap<>();
 
-            for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-                if (neighbor != null && neighbor.node != null) {
-                    sortedInteractions.put(neighbor.node.getID(), getNumberInteractions
-     (neighbor.node
-                            .getID(), type, GOOD));
+        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+            if (neighbor != null && neighbor.node != null) {
+                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions(neighbor.node
+                        .getID(), type, GOOD));
+            }
+        }
+        return sortByValues(sortedInteractions);
+    }
+
+    Pair<Long, Integer> getBestNode(TYPE type) {
+        Pair<Long, Integer> bestNode = new Pair<>(0L, 0);
+
+        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+            if (neighbor != null && neighbor.node != null) {
+
+                //TODO check why interaction result needs to be good
+                int count = getNumberInteractions(neighbor.node.getID(), type, GOOD);
+                if (count > bestNode.getValue()) {
+                    bestNode = new Pair<>(neighbor.node.getID(), count);
                 }
             }
-            return sortByValues(sortedInteractions);
         }
+        return bestNode;
+    }
 
     @Override
     public Object clone() {
