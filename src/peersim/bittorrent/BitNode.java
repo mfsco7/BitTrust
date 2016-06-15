@@ -107,6 +107,10 @@ public class BitNode extends GeneralNode {
         behaviour = Behaviour.BAD_CHUNK;
     }
 
+    boolean isBadChunk() {
+        return behaviour == Behaviour.BAD_CHUNK;
+    }
+
     public void setSlow() {
         behaviour = Behaviour.SLOW;
     }
@@ -408,6 +412,7 @@ public class BitNode extends GeneralNode {
         DescriptiveStatistics statsITP = new DescriptiveStatistics();
         DescriptiveStatistics statsCRP = new DescriptiveStatistics();
 
+        //TODO remove/scrap the filter the outliers in score calculations
         for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
             if (neighbor.node != null && neighbor.node.getID() != nodeID) {
                 double[] percentages = percentage.get(neighbor.node.getID());
