@@ -194,8 +194,12 @@ public class NetworkInitializer implements Control {
                 EDSimulator.add(latency, ev, tracker, pid);
                 ev = new SimpleEvent(CHOKE_TIME);
                 EDSimulator.add(10000, ev, n, pid);
-                ev = new SimpleEvent(OPTUNCHK_TIME);
-                EDSimulator.add(30000, ev, n, pid);
+                //remove optimistic unchoke for trust
+                //trust already consider new nodes and behaviour change(?)
+                if (Configuration.getString("protocol.simulation.unchoking").equals("ORIGINAL")) {
+                    ev = new SimpleEvent(OPTUNCHK_TIME);
+                    EDSimulator.add(30000, ev, n, pid);
+                }
                 ev = new SimpleEvent(ANTISNUB_TIME);
                 EDSimulator.add(60000, ev, n, pid);
                 ev = new SimpleEvent(CHECKALIVE_TIME);
