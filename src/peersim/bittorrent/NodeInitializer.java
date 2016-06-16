@@ -131,12 +131,16 @@ public class NodeInitializer{
 	 */
 	private void setBandwidth(BitTorrent p){
 		int value = CommonState.r.nextInt(4);
-		switch(value){
+
+		//bandwidth not random, case 2 instead(1Mpbs)
+		//nodes should have same bandwidth, it makes more sense to compare
+		/* switch(value){
 			case 0: p.setBandwidth(640);break; //640Kbps
 			case 1: p.setBandwidth(1024);break;// 1Mbps
 			case 2: p.setBandwidth(2048);break;// 2Mbps
 			case 3: p.setBandwidth(4096);break; //4Mbps
-		}
+		}*/
+		p.setBandwidth(1024);
 	}
 	
 	/**
