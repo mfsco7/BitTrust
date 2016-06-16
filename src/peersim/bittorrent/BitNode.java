@@ -137,22 +137,25 @@ public class BitNode extends GeneralNode {
         return true;
     }
 
-        static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
-            List list = new LinkedList<>(map.entrySet());
-            // Defined Custom Comparator here
-            Collections.sort(list, (o1, o2) -> ((Comparable) ((Map.Entry) (o1)).getValue())
-     .compareTo(((Map.Entry) (o2))
-                    .getValue()));
-
-            // Here I am copying the sorted list in HashMap
-            // using LinkedHashMap to preserve the insertion order
-            HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
-            for (Iterator it = list.iterator(); it.hasNext(); ) {
-                Map.Entry entry = (Map.Entry) it.next();
-                sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
-            }
-            return sortedHashMap;
-        }
+//        static HashMap<Long, Integer> sortByValues(HashMap<Long, Integer> map) {
+//            List list = new LinkedList<>(map.entrySet());
+//            // Defined Custom Comparator here
+//            if (list.size() > 0) {
+//
+//                Collections.sort(list, (o1, o2) -> ((Comparable) ((Map.Entry) (o1)).getValue())
+//                        .compareTo(((Map.Entry) (o2)).getValue()));
+//
+//                // Here I am copying the sorted list in HashMap
+//                // using LinkedHashMap to preserve the insertion order
+//                HashMap<Long, Integer> sortedHashMap = new LinkedHashMap<>();
+//                for (Iterator it = list.iterator(); it.hasNext(); ) {
+//                    Map.Entry entry = (Map.Entry) it.next();
+//                    sortedHashMap.put((Long) entry.getKey(), (Integer) entry.getValue());
+//                }
+//                return sortedHashMap;
+//            }
+//            return map;
+//        }
 
 
 
@@ -259,18 +262,18 @@ public class BitNode extends GeneralNode {
         }
     }
 
-    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
-
-        HashMap<Long, Integer> sortedInteractions = new HashMap<>();
-
-        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
-            if (neighbor != null && neighbor.node != null) {
-                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions(neighbor.node
-                        .getID(), type, GOOD));
-            }
-        }
-        return sortByValues(sortedInteractions);
-    }
+//    public HashMap<Long, Integer> getSortedInteractions(TYPE type) {
+//
+//        HashMap<Long, Integer> sortedInteractions = new HashMap<>();
+//
+//        for (Neighbor neighbor : ((BitTorrent) (getProtocol(pid))).getCache()) {
+//            if (neighbor != null && neighbor.node != null) {
+//                sortedInteractions.put(neighbor.node.getID(), getNumberInteractions(neighbor.node
+//                        .getID(), type, GOOD));
+//            }
+//        }
+//        return sortByValues(sortedInteractions);
+//    }
 
     Pair<Long, Integer> getBestNode(TYPE type) {
         Pair<Long, Integer> bestNode = new Pair<>(0L, 0);
